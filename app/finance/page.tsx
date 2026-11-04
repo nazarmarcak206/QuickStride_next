@@ -7,7 +7,7 @@ import { MonthSwitcher } from "@/components/MonthSwitcher";
 import { WeekSwitcher, weekLabel } from "@/components/WeekSwitcher";
 import { ListPicker } from "@/components/ListPicker";
 import { paymentTypeOptions } from "@/components/forms";
-import { AnimatedCount, AnimatedMoney } from "@/components/AnimatedNumbers";
+import { AnimatedMoney } from "@/components/AnimatedNumbers";
 import { currentMonthKey, formatDay, formatMoney, monthLabel, monthShortLabel, todayISO } from "@/lib/money";
 import { pluralProjects } from "@/lib/text";
 import { weekStartISO, weekTotal, weeklySeriesForWeek, type WeekDay } from "@/lib/finance";
@@ -27,12 +27,13 @@ type Period = "week" | "month";
 // Скільки проєктів показувати в розбивці до натискання «Показати всі».
 const EXPECTED_PREVIEW = 3;
 
-// Тижневі бари: 7 слотів Пн–Нд з підписами дня. Значення дублюються
-// текстовим списком нижче, тож графік читається і без кольору.
-function WeekBars({ series, currency }: { series: WeekDay[]; currency: Currency }) {
+// Тижневі бари: 7 слотів Пн–Нд з підписами дня. Дні з оплат позначені
+// жирним підписом, значення доступні текстом («Розбивка по днях»),
+// тож графік читається і без кольору.
+function WeekBars({ series, ariaLabel }: { series: WeekDay[]; ariaLabel: string }) {
   const max = Math.max(...series.map((item) => item.minor), 1);
   return (
-    <div className="day-bars" role="img" aria-label={`Оплати по днях тижня, ${currency}`}>
+    <div className="day-bars" role="img" aria-label={ariaLabel}>
       {series.map((item) => (
         <span className="day-bar-slot" key={item.iso}>
           <span
@@ -192,9 +193,7 @@ export default function Finance() {
     <div className="page-stack">
       <header className="page-head">
         <h1>Фінанси</h1>
-        <p className="page-sub">
-          Фактичні оплати за проєктами. Лише вручну внесені записи.
-        </p>
+        <p className="page-sub">Лише вручну внесені оплати.</p>
       </header>
 
       <section className="card">
@@ -232,7 +231,6 @@ export default function Finance() {
               : `У тиждень ${weekLabel(weekStart)} оплат ще не було.`}
           </p>
         )}
-        <p className="form-hint">Очікувані доплати — окремий блок нижче, це ще не отримані кошти.</p>
       </section>
 
       <section className="card">
@@ -247,7 +245,10 @@ export default function Finance() {
               return (
                 <div key={row.currency} className="expected-group">
                   <div className="stat-row">
-                    <span className="stat-currency">{row.currency}</span>
+                    <span className="stat-currency">
+                      {row.currency}
+                      <small className="stat-count">· {row.projects.length} {pluralProjects(row.projects.length)}</small>
+                    </span>
                     <strong className="stat-value accent">
                       <AnimatedMoney minor={row.minor} currency={row.currency} />
                     </strong>
@@ -258,12 +259,6 @@ export default function Finance() {
                       <strong>{formatMoney(remaining, row.currency)}</strong>
                     </div>
                   ))}
-                  {row.projects.length > visible.length && (
-                    <p className="form-hint">
-                      Показано {visible.length} з {row.projects.length}{" "}
-                      {pluralProjects(row.projects.length)} — сума вище вже враховує всі.
-                    </p>
-                  )}
                   {row.projects.length > EXPECTED_PREVIEW && (
                     <button
                       type="button"
@@ -281,10 +276,6 @@ export default function Finance() {
                 </div>
               );
             })}
-            <p className="form-hint">
-              Завершений проєкт із недоотриманою сумою лишається тут, доки
-              оплату не внесено.
-            </p>
           </div>
         ) : (
           <p className="card-empty">
@@ -313,39 +304,37 @@ export default function Finance() {
           )}
         </div>
         <WeekSwitcher weekStart={weekStart} onChange={setWeekStart} todayISODate={todayDate} />
-        <WeekBars series={weekSeries} currency={weekCurrencyActive} />
+        <WeekBars series={weekSeries} ariaLabel={`Оплати по днях тижня ${weekLabel(weekStart)}, ${weekCurrencyActive}. Разом ${formatMoney(weekSum, weekCurrencyActive)}`} />
         {weekSum > 0 ? (
           <>
             <p className="chart-total">
-              Разом за {weekLabel(weekStart)}:{" "}
+              <span>Разом за тиждень {weekLabel(weekStart)}</span>
               <strong>
                 <AnimatedMoney minor={weekSum} currency={weekCurrencyActive} />
               </strong>
-              <small>
-                {" "}· оплат у <AnimatedCount value={weekPaidDays.length} /> з 7 днів
-              </small>
             </p>
-            <ul className="chart-days">
-              {weekPaidDays.map(day => (
-                <li key={day.iso}>
-                  {formatDay(day.iso)} ({day.label}) —{" "}
-                  {formatMoney(day.minor, weekCurrencyActive)}
-                </li>
-              ))}
-            </ul>
+            <details className="chart-details">
+              <summary>Розбивка по днях</summary>
+              <ul className="chart-days">
+                {weekPaidDays.map(day => (
+                  <li key={day.iso}>
+                    {formatDay(day.iso)} ({day.label}) —{" "}
+                    {formatMoney(day.minor, weekCurrencyActive)}
+                  </li>
+                ))}
+              </ul>
+            </details>
           </>
         ) : (
           <p className="card-empty">
-            У тиждень {weekLabel(weekStart)} оплат у {weekCurrencyActive} не
-            було — дні без оплат показані порожніми. Перемкніть тиждень або
-            валюту.
+            У тиждень {weekLabel(weekStart)} оплат у {weekCurrencyActive} не було.
           </p>
         )}
       </section>
 
       <section className="card">
         <div className="card-head">
-          <h2>Графік за місяцями</h2>
+          <h2>Надходження за 6 місяців</h2>
           {currencies.length > 1 && (
             <div className="chip-row" role="group" aria-label="Валюта місячного графіка">
               {currencies.map(currency => (
@@ -363,9 +352,6 @@ export default function Finance() {
           )}
         </div>
         <MonthBars series={series} currency={activeChartCurrency} />
-        <p className="form-hint">
-          Останні 6 місяців · {activeChartCurrency}. Різні валюти не об’єднуємо.
-        </p>
       </section>
 
       <section className="card">
@@ -396,7 +382,7 @@ export default function Finance() {
                     </small>
                     {project && payment.currency !== project.currency && (
                       <small className="foreign-currency">
-                        оплата в {payment.currency}, проєкт у {project.currency} — сума не змішується
+                        оплата в {payment.currency} — не входить до сум у {project.currency}
                       </small>
                     )}
                   </span>
@@ -412,7 +398,7 @@ export default function Finance() {
           <EmptyState
             icon={<TrendingUp size={26} />}
             title="Оплат ще немає"
-            hint="Додайте передоплату чи доплату в картці проєкту — запис автоматично з’явиться тут."
+            hint="Додайте першу оплату в картці проєкту."
           />
         )}
       </section>

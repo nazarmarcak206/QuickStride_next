@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { clientPaidByCurrency, clientPayments, clientProjects, findDuplicateClient, normalizedClientName } from "./clients";
+import {
+  SIMILAR_NAME_THRESHOLD,
+  clientKindLabel,
+  clientPaidByCurrency,
+  clientPayments,
+  clientProjects,
+  findDuplicateClient,
+  filterClients,
+  isClientKind,
+  nameSimilarity,
+  normalizedClientName,
+  suggestClients,
+} from "./clients";
 import { makeDemoState } from "./demoData";
-import type { CrmState, Payment, Project } from "./types";
+import type { Client, CrmState, Payment, Project } from "./types";
 
 const state = makeDemoState();
 
@@ -89,5 +101,119 @@ describe("пов'язані дані клієнта", () => {
     const archivedClients = state.clients.map((c) => (c.id === client.id ? { ...c, archived: true } : c));
     const projectsAfter = state.projects.filter((p) => archivedClients.find((c) => c.id === p.clientId)?.id === client.id);
     expect(projectsAfter.length).toBe(projectsBefore.length);
+  });
+});
+
+// --- Тип клієнта -------------------------------------------------------------
+
+function fixture(partial: Partial<Client> & { id: string }): Client {
+  return { name: "", company: "", phone: "", telegram: "", email: "", note: "", kind: null, archived: false, createdAt: "", ...partial };
+}
+
+const directory: Client[] = [
+  fixture({ id: "a", name: "Олена Марченко", company: "Misto Studio", telegram: "@olena", email: "olena@misto.ua" }),
+  fixture({ id: "b", name: "Олена Коваленко", phone: "+380631112233" }),
+  fixture({ id: "c", name: "Максим Савчук", company: "Law Office", kind: "Постійний" }),
+  fixture({ id: "d", name: "Bonna Ceramics", kind: "Непостійний", archived: true }),
+];
+
+describe("тип клієнта", () => {
+  it("демонстраційні дані містять обидва типи і запис без типу", () => {
+    const kinds = state.clients.map((client) => client.kind);
+    expect(kinds).toContain("Постійний");
+    expect(kinds).toContain("Непостійний");
+    expect(kinds.filter((kind) => kind === null)).toHaveLength(1);
+  });
+
+  it("запис без ознаки показується як «Не вказано», а не як «Непостійний»", () => {
+    expect(clientKindLabel(null)).toBe("Не вказано");
+    expect(clientKindLabel("Постійний")).toBe("Постійний");
+  });
+
+  it("перевірка типу приймає лише дві фірмові форми", () => {
+    expect(isClientKind("Постійний")).toBe(true);
+    expect(isClientKind("Непостійний")).toBe(true);
+    expect(isClientKind("постійний")).toBe(false);
+    expect(isClientKind(null)).toBe(false);
+    expect(isClientKind(undefined)).toBe(false);
+  });
+
+  it("фільтр за типом бере саме цю групу", () => {
+    expect(filterClients(directory, { archived: false, kind: "Постійний" }).map((c) => c.id)).toEqual(["c"]);
+    expect(filterClients(directory, { archived: true, kind: "Непостійний" }).map((c) => c.id)).toEqual(["d"]);
+  });
+
+  it("фільтр «не вказано» — це старі записи без ознаки", () => {
+    expect(filterClients(directory, { archived: false, kind: "не вказано" }).map((c) => c.id)).toEqual(["b", "a"]);
+  });
+
+  it("фільтр «усі» не чіпає тип, а активний список не показує архів", () => {
+    expect(filterClients(directory, { archived: false, kind: "усі" }).map((c) => c.id)).toEqual(["c", "b", "a"]);
+    expect(filterClients(directory, { archived: true, kind: "усі" }).map((c) => c.id)).toEqual(["d"]);
+  });
+
+  it("пошук і тип працюють разом, список сортований за іменем", () => {
+    const withQuery = filterClients(directory, { query: "олена", archived: false, kind: "усі" });
+    expect(withQuery.map((c) => c.name)).toEqual(["Олена Коваленко", "Олена Марченко"]);
+  });
+
+  it("тип не впливає на фінанси: сума оплаченого та сама для будь-якого типу", () => {
+    const olena = state.clients.find((c) => c.name === "Олена Марченко")!;
+    const flipped: CrmState = {
+      ...state,
+      clients: state.clients.map((c) => (c.id === olena.id ? { ...c, kind: c.kind === "Постійний" ? "Непостійний" : "Постійний" } : c)),
+    };
+    expect(clientPaidByCurrency(flipped, olena.id)).toEqual(clientPaidByCurrency(state, olena.id));
+    expect(clientProjects(flipped, olena.id)).toEqual(clientProjects(state, olena.id));
+  });
+});
+
+// --- Ранжування пошуку у полі клієнта ---------------------------------------
+
+describe("підказки клієнтів у формі", () => {
+  it("порожній запит — увесь список без змін", () => {
+    expect(suggestClients(directory, "")).toEqual(directory);
+    expect(suggestClients(directory, "   ")).toEqual(directory);
+  });
+
+  it("точний збіг знаходить саме цю людину, а не однофамільця", () => {
+    expect(suggestClients(directory, "Олена Марченко").map((c) => c.id)).toEqual(["a"]);
+    expect(suggestClients(directory, "Максим").map((c) => c.id)).toEqual(["c"]);
+  });
+
+  it("пошук по середині імені та за другим словом працює", () => {
+    expect(suggestClients(directory, "коваленко").map((c) => c.id)).toEqual(["b"]);
+    expect(suggestClients(directory, " ceramics ").map((c) => c.id)).toEqual(["d"]);
+  });
+
+  it("одруківка знаходиться завдяки схожості — точний варіант перший", () => {
+    const ids = suggestClients(directory, "Олена Марченка").map((c) => c.id);
+    expect(ids[0]).toBe("a");
+    expect(ids).not.toContain("c");
+  });
+
+  it("компонія, telegram та email — резервні варіанти пошуку", () => {
+    expect(suggestClients(directory, "olena@misto.ua").map((c) => c.id)).toEqual(["a"]);
+    expect(suggestClients(directory, "misto").map((c) => c.id)).toEqual(["a"]);
+    expect(suggestClients(directory, "law office").map((c) => c.id)).toEqual(["c"]);
+  });
+
+  it("за запитом, на який немає нікого, список порожній — форма покаже кнопку створення", () => {
+    expect(suggestClients(directory, "Іван Франко")).toEqual([]);
+  });
+
+  it("схожість: нормалізовані однакові імена — 1, одруківка вище порога, різні люди нижче", () => {
+    expect(nameSimilarity("Олена Марченко", "олена  марченко")).toBe(1);
+    expect(nameSimilarity("Олена Марченко", "Олена Марченка")).toBeGreaterThanOrEqual(SIMILAR_NAME_THRESHOLD);
+    expect(nameSimilarity("Олена Марченко", "Максим Савчук")).toBeLessThan(SIMILAR_NAME_THRESHOLD);
+    expect(nameSimilarity("", "А")).toBe(0);
+  });
+
+  it("архівований запис лишається у видачі: зв'язок з проєктом нікуди не дівся", () => {
+    expect(suggestClients(directory, "Bonna").map((c) => c.id)).toEqual(["d"]);
+  });
+
+  it("точний збіг у списку не губиться через нульовий бал", () => {
+    expect(suggestClients([fixture({ id: "z", name: "Тарас Шевченко" })], "Тарас Шевченко").map((c) => c.id)).toEqual(["z"]);
   });
 });

@@ -11,6 +11,7 @@ function client(partial: Partial<Client> = {}): Client {
     telegram: "",
     email: "",
     note: "",
+    kind: null,
     archived: false,
     createdAt: "",
     ...partial,

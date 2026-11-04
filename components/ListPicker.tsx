@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Sheet } from "./ui";
 import { haptic } from "@/lib/telegram";
@@ -12,9 +12,17 @@ export type PickerOption<T extends string = string> = {
   swatch?: React.ReactNode;
 };
 
+export type PickerSearch = {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+};
+
 /**
  * Нижній лист вибору за зразком статусу проєкту: великі варіанти, aria-selected
  * для поточного, клавіатура — стрілки/Home/End і пошук за першою літерою, Esc — закриття.
+ * `search` додає поле живого пошуку: тоді перший фокус лишається в ньому,
+ * а стрілка вниз переводить його на варіанти.
  */
 export function PickerSheet<T extends string>({
   title,
@@ -22,6 +30,7 @@ export function PickerSheet<T extends string>({
   value,
   empty,
   footer,
+  search,
   onSelect,
   onClose,
 }: {
@@ -30,17 +39,24 @@ export function PickerSheet<T extends string>({
   value?: T | "";
   empty?: React.ReactNode;
   footer?: React.ReactNode;
+  search?: PickerSearch;
   onSelect: (value: T) => void;
   onClose: () => void;
 }) {
   const optionRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const skipFirstOptionFocus = useRef(Boolean(search));
   const [active, setActive] = useState(() => {
     const index = options.findIndex((option) => option.value === value);
     return index >= 0 ? index : 0;
   });
 
   // Фокус на поточному варіанті: лист одразу читається з клавіатури.
+  // Перший рендер із полем пошуку пропускаємо — інакше пошук втратить фокус.
   useEffect(() => {
+    if (skipFirstOptionFocus.current) {
+      skipFirstOptionFocus.current = false;
+      return;
+    }
     optionRefs.current[active]?.focus();
   }, [active]);
 
@@ -88,6 +104,22 @@ export function PickerSheet<T extends string>({
 
   return (
     <Sheet title={title} onClose={onClose}>
+      {search && (
+        <label className="search-box sheet-search">
+          <Search size={16} />
+          <input
+            autoFocus
+            value={search.value}
+            onChange={(event) => search.onChange(event.target.value)}
+            placeholder={search.placeholder ?? "Пошук…"}
+            onKeyDown={(event) => {
+              if (event.key !== "ArrowDown") return;
+              event.preventDefault();
+              optionRefs.current[0]?.focus();
+            }}
+          />
+        </label>
+      )}
       {options.length === 0 ? (
         empty ?? <p className="card-empty">Немає чого обрати.</p>
       ) : (

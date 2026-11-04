@@ -35,6 +35,7 @@ export function makeDemoState(): CrmState {
     {
       id: seedId("client"),
       name: "Олена Марченко",
+      kind: "Постійний",
       company: "Misto Studio",
       phone: "+380 67 111 22 33",
       telegram: "@olenamk",
@@ -46,6 +47,7 @@ export function makeDemoState(): CrmState {
     {
       id: seedId("client"),
       name: "Андрій Коваленко",
+      kind: "Непостійний",
       company: "Northline Coffee",
       phone: "+380 50 222 33 44",
       telegram: "@akoval",
@@ -57,6 +59,7 @@ export function makeDemoState(): CrmState {
     {
       id: seedId("client"),
       name: "Максим Савчук",
+      kind: "Постійний",
       company: "Savchuk Legal",
       phone: "+380 63 333 44 55",
       telegram: "@savchuk",
@@ -68,6 +71,7 @@ export function makeDemoState(): CrmState {
     {
       id: seedId("client"),
       name: "Bonna Ceramics",
+      kind: null,
       company: "Bonna Ceramics GmbH",
       phone: "",
       telegram: "@bonnaceramics",

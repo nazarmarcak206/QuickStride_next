@@ -35,6 +35,11 @@
   --ease-sheet: cubic-bezier(0.22, 1, 0.36, 1);
   --press-ms: 120ms;
 
+  /* Видима область екрана: lib/viewport.ts переписує ці значення, коли
+     розкривається клавіатура або browser-панелі. 100dvh — без них. */
+  --vv-h: 100dvh;
+  --vv-top: 0px;
+
   /* Рідке скло: напівпрозорі поверхні + розмиття + відблиск по верхній грані */
   --glass: color-mix(in srgb, var(--surface) 78%, transparent);
   --glass-strong: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -91,7 +96,7 @@ p { margin: 0; }
    кнопка та нижні листи під час анімації стрибали б від верху сторінки.
    Без fill-mode: залишений стан теж прилипав би до сторінки. */
 @keyframes page-in { from { opacity: 0; top: 4px; } to { opacity: 1; top: 0; } }
-.page-stack { display: flex; flex-direction: column; gap: 14px; }
+.page-stack { display: flex; flex-direction: column; gap: 16px; }
 .page-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; }
 .page-sub { color: var(--muted); font-size: 14px; margin-top: 3px; }
 
@@ -214,10 +219,10 @@ p { margin: 0; }
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   border-radius: 20px;
-  padding: 16px;
+  padding: 18px;
   box-shadow: var(--shadow), inset 0 1px 0 var(--glass-highlight);
 }
-.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .card-head h2 { font-size: 16px; font-weight: 600; }
 .card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
 .card-empty { color: var(--muted); font-size: 14px; line-height: 1.45; }
@@ -428,7 +433,7 @@ p { margin: 0; }
 .fact-row strong { color: var(--ink); }
 .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
 .summary-grid small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
-.summary-grid strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary-grid strong { font-size: 17px; font-weight: 800; letter-spacing: -0.2px; font-variant-numeric: tabular-nums; }
 .finance-summary {
   background: linear-gradient(
     160deg,
@@ -479,10 +484,12 @@ p { margin: 0; }
 .pill-cancelled { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 
 /* --- Фінанси --------------------------------------------------------------- */
-.stat-rows { display: flex; flex-direction: column; gap: 8px; }
+.stat-rows { display: flex; flex-direction: column; gap: 10px; }
 .stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .stat-currency { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.4px; }
-.stat-value { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; font-variant-numeric: tabular-nums; }
+.stat-count { margin-left: 6px; font-weight: 500; letter-spacing: 0; opacity: 0.85; }
+/* Головні суми — великі та табличні: орієнтир «iOS: перше, що читається очі» */
+.stat-value { font-size: 28px; font-weight: 800; letter-spacing: -0.6px; font-variant-numeric: tabular-nums; }
 .stat-value.accent { color: var(--accent); }
 .expected-group { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
 .expected-group:last-of-type { border-bottom: 0; }
@@ -518,15 +525,25 @@ p { margin: 0; }
 .month-bar-label { font-size: 11px; color: var(--muted); }
 
 /* --- Форми і шітки ---------------------------------------------------------- */
+@supports not (height: 100dvh) {
+  :root { --vv-h: 100vh; }
+}
 .sheet-backdrop {
-  position: fixed; inset: 0; z-index: 50;
+  /* top/height замість inset: 0 — лист має залишатися над клавіатурою,
+    а не під нею (iOS не зменшує layout viewport). */
+  position: fixed; top: var(--vv-top, 0px); left: 0; right: 0;
+  height: var(--vv-h, 100dvh);
+  z-index: 50;
   background: rgba(12, 9, 7, 0.55);
   display: flex; align-items: flex-end; justify-content: center;
   animation: backdrop-in 0.18s ease;
 }
+/* Усі листи — діти <body> (portal), тому зсув клавіатури рахується один раз
+   навіть для вкладеного листа поверх форми. */
 @keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
 .sheet {
-  width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto;
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 520px; max-height: 88%; overflow: hidden;
   background: var(--glass-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
@@ -534,20 +551,50 @@ p { margin: 0; }
   color: var(--ink);
   border-radius: 24px 24px 0 0; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
   box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-  will-change: transform;
   animation: sheet-up 0.24s var(--ease-sheet);
 }
 @keyframes sheet-up { from { transform: translateY(28px); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
-.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.sheet-head h2 { font-size: 18px; font-weight: 700; }
+/* Створення й редагування на телефоні — майже повноекранний лист:
+   заголовок і закриття завжди видно, поля прокручуються всередині. */
+.sheet-form { height: 100%; max-height: none; }
+.sheet-form .sheet-head { padding-top: env(safe-area-inset-top, 0px); }
+/* Під клавіатурою домашня смуга не потрібна — лист і так упирається в неї. */
+html[data-keyboard-open] .sheet { padding-bottom: 18px; }
+.sheet-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.sheet-head h2 { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.sheet-body {
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+@media (min-width: 640px) {
+  .sheet-backdrop.is-form { align-items: center; padding: 24px; }
+  .sheet-form { height: auto; max-height: min(760px, 92%); border-radius: 24px; }
+  .sheet-form .sheet-head { padding-top: 0; }
+}
 .form-stack { display: flex; flex-direction: column; gap: 12px; }
-.form-row { display: flex; gap: 10px; align-items: flex-end; }
+/* Два поля в рядок тримаються, лише коли кожному вистачає ~160px.
+   WebKit не дає input[type=date] стискатися нижче своєї вбудованої ширини,
+   тому на вузькому екрані рядок розгортається у стовпчик, а не лізе за край. */
+.form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.form-row > .field { flex: 1 1 160px; }
+/* date/time на iPhone — найвибагливіші: на вузькому екрані їм потрібна весь рядок. */
+@media (max-width: 429px) {
+  .form-row:has(input[type="date"]),
+  .form-row:has(input[type="time"]) { flex-direction: column; align-items: stretch; }
+}
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); flex: 1; min-width: 0; }
 .field input, .field textarea {
   border: 1px solid var(--line); border-radius: 12px;
   background: var(--surface-soft); color: var(--ink);
-  padding: 11px 12px; font-size: 15px; font-weight: 400; width: 100%;
+  padding: 11px 12px; font-size: 15px; font-weight: 400; width: 100%; min-width: 0; max-width: 100%;
   transition: border-color var(--press-ms) ease, box-shadow var(--press-ms) ease;
+}
+/* 15px на сенсорному екрані — iOS при фокусі зумить усю сторінку, і форма
+   виходить за правий край. 16px авто-зум не вмикає. */
+@media (hover: none) and (pointer: coarse) {
+  .field input, .field textarea { font-size: 16px; }
 }
 .field input:focus-visible, .field textarea:focus-visible { border-color: var(--accent); }
 .field input::placeholder, .field textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
@@ -599,6 +646,20 @@ p { margin: 0; }
   border-radius: 12px;
 }
 .form-warn svg { flex-shrink: 0; margin-top: 2px; }
+/* Живий розрахунок передоплати: «погоджено − передоплата = залишок» видно
+   до створення, тому не доводиться рахувати в голові. */
+.prepay-summary {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 11px 12px; border-radius: 12px;
+  background: var(--surface-soft); border: 1px dashed var(--line);
+}
+.prepay-line { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); }
+.prepay-line strong { font-size: 15px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.prepay-line.total { border-top: 1px solid var(--line); padding-top: 8px; }
+.prepay-line.total span { color: var(--ink-soft); font-weight: 600; }
+/* Поле пошуку і кнопка створення всередині листа вибору. */
+.sheet-search { margin-bottom: 12px; }
+.sheet-create { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .reset-card { display: flex; flex-direction: column; gap: 8px; }
 .reset-title { font-weight: 700; font-size: 15px; }
 .reset-text { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
@@ -691,11 +752,10 @@ p { margin: 0; }
 /* --- Дашборд: фінансовий огляд ---------------------------------------------- */
 .overview-label {
   font-size: 13px; font-weight: 600; color: var(--muted);
-  margin: 10px 0 6px; display: flex; align-items: center; gap: 5px;
+  margin: 14px 0 8px; display: flex; align-items: center; gap: 5px;
 }
 .overview-label.warn { color: var(--danger); }
-.overview-divider { border-top: 1px dashed var(--line); margin-top: 14px; }
-.stat-value.muted { color: var(--ink-soft); }
+.overview-divider { border-top: 1px dashed var(--line); margin-top: 16px; }
 
 /* --- Дашборд: денний графік --------------------------------------------------- */
 .day-bars {
@@ -709,9 +769,23 @@ p { margin: 0; }
 .day-bar { width: 100%; min-width: 2px; border-radius: 3px 3px 1px 1px; background: transparent; }
 .day-bar.filled { background: var(--accent); }
 .day-bar-slot i { font-style: normal; font-size: 9px; color: var(--muted); }
-.chart-total { font-size: 14px; color: var(--ink-soft); margin: 4px 0 8px; }
-.chart-total strong { font-size: 16px; color: var(--ink); }
-.chart-total small { color: var(--muted); font-size: 12px; }
+.chart-total { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 10px 0 2px; }
+.chart-total span { font-size: 13px; font-weight: 600; color: var(--muted); }
+.chart-total strong { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+/* Розбивка по днях — за потреби: під сумою лиш коротке посилання */
+.chart-details summary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 0; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer;
+  list-style: none;
+}
+.chart-details summary::-webkit-details-marker { display: none; }
+.chart-details summary::after {
+  content: ""; width: 6px; height: 6px; flex-shrink: 0;
+  border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 0.18s var(--ease-sheet);
+}
+.chart-details[open] summary::after { transform: rotate(-135deg) translateY(-1px); }
 .chart-days { margin: 0; padding: 0 0 0 4px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .chart-days li { font-size: 13px; color: var(--ink-soft); border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
 .chart-days li:last-child { border-bottom: 0; }
@@ -778,6 +852,20 @@ body[data-page-revealed] .status-diagram { animation-play-state: running; }
   display: inline-flex; align-items: center; gap: 3px;
   color: var(--muted); font-size: 11px; font-weight: 600;
 }
+/* Тип клієнта — позначка, а не стать: «Не вказано» навмисно нейтральне,
+   щоб старий запис без ознаки не виглядав як «Непостійний». */
+.kind-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  border: 1px solid var(--line); color: var(--ink-soft); background: var(--surface-soft);
+}
+.kind-tag.is-regular { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 40%, var(--line)); }
+.kind-tag.is-oneoff { color: var(--muted); }
+.kind-tag.is-unknown { color: var(--muted); border-style: dashed; }
+.kind-tag.small { padding: 2px 7px; font-size: 10.5px; }
+.kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px; }
+.kind-row small { color: var(--muted); font-size: 11.5px; }
 .paid-block { padding: 4px 0 2px; }
 .fact-rows.contacts { margin-top: 4px; }
 .fact-rows.contacts .fact-row { color: var(--ink); gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--line); }

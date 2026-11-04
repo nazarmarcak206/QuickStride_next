@@ -27,6 +27,13 @@ export const PAYMENT_TYPES: PaymentType[] = [
   "Інша оплата",
 ];
 
+// Тип клієнта — лише позначка для списку й фільтра. Він не бере участі в
+// розрахунку залишків, очікуваних доплат чи статусів проєктів.
+export const CLIENT_KINDS = ["Постійний", "Непостійний"] as const;
+
+export type ClientKind = (typeof CLIENT_KINDS)[number];
+
+// `null` — ознаку ще не задано (старі записи та нові без вибору).
 export type Client = {
   id: string;
   name: string;
@@ -35,6 +42,7 @@ export type Client = {
   telegram: string;
   email: string;
   note: string;
+  kind: ClientKind | null;
   archived: boolean;
   createdAt: string;
 };

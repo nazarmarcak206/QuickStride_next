@@ -18,15 +18,16 @@ import {
 import { EmptyState, Sheet, StatusPill, Toast, useToast } from "@/components/ui";
 import { StatusPicker } from "@/components/StatusPicker";
 import { ListPicker } from "@/components/ListPicker";
-import { PaymentForm, ProjectForm, paymentTypeOptions, type PaymentInput, type ProjectInput } from "@/components/forms";
+import { PaymentForm, ProjectForm, paymentTypeOptions, type PaymentInput } from "@/components/forms";
 import { formatDay, formatMoney } from "@/lib/money";
 import { overpayMinor, overpayNotice, receivedAfterMinor } from "@/lib/payments";
+import { createProjectWithPrepayment } from "@/lib/projectCreate";
 import { projectOtherCurrencyReceived, projectReceivedMinor, useCrm } from "@/lib/store";
 import { haptic } from "@/lib/telegram";
 import { PROJECT_STATUSES, type Payment, type Project } from "@/lib/types";
 
 function ProjectDetail({ project, onClose }: { project: Project; onClose: () => void }) {
-  const { state, updateProject, addPayment, updatePayment, deletePayment } = useCrm();
+  const { state, addClient, updateProject, addPayment, updatePayment, deletePayment } = useCrm();
   const { toast, notify } = useToast();
   const [payOpen, setPayOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -118,8 +119,7 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
             <p className="foreign-currency">
               <CircleAlert size={13} />
               <span>
-                Окремо, в іншій валюті: {otherCurrency.map((row) => formatMoney(row.minor, row.currency)).join(" · ")} — ці{" "}
-                {otherCurrency.length === 1 ? "запис не складається" : "записи не складаються"} з {project.currency} і не зменшують залишок.
+                Окремо, в іншій валюті: {otherCurrency.map((row) => formatMoney(row.minor, row.currency)).join(" · ")} — на залишок не впливають.
               </span>
             </p>
           )}
@@ -127,8 +127,7 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
             <p className="overpay-note">
               <CircleAlert size={13} />
               <span>
-                Переплата: {formatMoney(overpay, project.currency)} — отримано {formatMoney(received, project.currency)} проти
-                погоджених {formatMoney(project.amountMinor, project.currency)}. Залишок — 0, на інший проєкт сума не переноситься.
+                Переплата {formatMoney(overpay, project.currency)}: отримано {formatMoney(received, project.currency)} проти погоджених {formatMoney(project.amountMinor, project.currency)}.
               </span>
             </p>
           )}
@@ -148,7 +147,6 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
           <button type="button" className="button-primary wide" onClick={() => setPayOpen(true)}>
             <Plus size={16} /> Додати оплату
           </button>
-          <p className="form-hint">Завершення проєкту саме по собі не означає отримання грошей — оплати вносяться вручну.</p>
         </section>
 
         <section className="card">
@@ -194,7 +192,7 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
                         </small>
                         {payment.currency !== project.currency && (
                           <small className="foreign-currency">
-                            валюта {payment.currency} ≠ валюта проєкту ({project.currency}) — поза залишком
+                            оплата в {payment.currency} — не входить до сум у {project.currency}
                           </small>
                         )}
                       </span>
@@ -209,9 +207,7 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
           ) : (
             <div className="empty-inline">
               <Wallet size={20} />
-              <p>
-                Оплат ще не було. Додайте передоплату, коли клієнт її надішле — вона одразу з’явиться у фінансах.
-              </p>
+              <p>Оплат ще не було.</p>
             </div>
           )}
         </section>
@@ -237,20 +233,22 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
       )}
 
       {payOpen && (
-        <Sheet title="Додати оплату" onClose={() => setPayOpen(false)}>
+        <Sheet title="Додати оплату" variant="form" onClose={() => setPayOpen(false)}>
           <PaymentForm project={project} payments={payments} onSubmit={handleAddPayment} />
         </Sheet>
       )}
 
       {editOpen && (
-        <Sheet title="Редагувати проєкт" onClose={() => setEditOpen(false)}>
+        <Sheet title="Редагувати проєкт" variant="form" onClose={() => setEditOpen(false)}>
           <ProjectForm
             clients={state.clients}
             initial={project}
             payments={payments}
-            onSubmit={(input) => {
-              updateProject(project.id, input);
+            onCreateClient={addClient}
+            onSubmit={({ project: edited }) => {
+              updateProject(project.id, edited);
               setEditOpen(false);
+              haptic("success");
               notify("Проєкт оновлено");
             }}
           />
@@ -355,7 +353,7 @@ function PaymentInlineEdit({
 }
 
 export default function Projects() {
-  const { state, addProject } = useCrm();
+  const { state, addClient, addProject, addPayment } = useCrm();
   const { toast, notify } = useToast();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("Усі");
@@ -402,9 +400,6 @@ export default function Projects() {
     <div className="page-stack">
       <header className="page-head">
         <h1>Проєкти</h1>
-        <p className="page-sub">
-          Угоди та замовлення з оплатами в одному місці.
-        </p>
       </header>
 
       <label className="search-box">
@@ -499,13 +494,15 @@ export default function Projects() {
       </button>
 
       {creating && (
-        <Sheet title="Новий проєкт" onClose={() => setCreating(false)}>
+        <Sheet title="Новий проєкт" variant="form" onClose={() => setCreating(false)}>
           <ProjectForm
             clients={state.clients}
-            onSubmit={input => {
-              addProject(input);
+            onCreateClient={addClient}
+            onSubmit={({ project: input, prepaymentMinor }) => {
+              const { payment } = createProjectWithPrepayment({ addProject, addPayment }, input, prepaymentMinor);
               setCreating(false);
-              notify("Проєкт створено");
+              haptic("success");
+              notify(payment ? `Проєкт і передоплату ${formatMoney(payment.amountMinor, payment.currency)} записано` : "Проєкт створено");
             }}
           />
         </Sheet>

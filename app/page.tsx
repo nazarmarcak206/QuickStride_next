@@ -5,11 +5,13 @@ import { AlarmClock, ArrowRight, Briefcase, Check, CircleAlert, Plus, Users, Wal
 import { useRouter } from "next/navigation";
 import { MonthSwitcher } from "@/components/MonthSwitcher";
 import { AnimatedCount, AnimatedMoney } from "@/components/AnimatedNumbers";
-import { ClientForm, PaymentForm, ProjectForm, ReminderForm, type ClientInput, type PaymentInput, type ProjectInput, type ReminderInput } from "@/components/forms";
+import { ClientForm, PaymentForm, ProjectForm, ReminderForm, type ClientInput, type PaymentInput, type ReminderInput } from "@/components/forms";
 import { PickerSheet, type PickerOption } from "@/components/ListPicker";
 import { Sheet, Toast, useToast } from "@/components/ui";
 import { dailySeriesForMonth, nearestDeadlines, seriesTotal, splitReminders, statusCounts, type DayValue, type StatusCount } from "@/lib/dashboard";
 import { currentMonthKey, formatDay, formatMoney, monthLabel, todayISO } from "@/lib/money";
+import { createProjectWithPrepayment } from "@/lib/projectCreate";
+import { pluralProjects } from "@/lib/text";
 import { currenciesInUse, expectedByCurrency, projectPayments, projectRemainingMinor, receivedInMonthMinor, useCrm } from "@/lib/store";
 import { haptic } from "@/lib/telegram";
 import { CURRENCIES, type Currency, type Project } from "@/lib/types";
@@ -65,14 +67,14 @@ function QuickAction({
   );
 }
 
-// Денні бари: висота пропорційна сумі дня. Значення дублюються текстом
-// нижче, тож графік читається й без кольору.
-function DayBars({ series, currency }: { series: DayValue[]; currency: Currency }) {
+// Денні бари: висота пропорційна сумі дня. Значення доступні текстом
+// («Розбивка по днях» нижче), тож графік читається й без кольору.
+function DayBars({ series, ariaLabel }: { series: DayValue[]; ariaLabel: string }) {
   const max = Math.max(...series.map((item) => item.minor), 1);
   const lastDay = series.length;
   const showLabel = (day: number) => [1, 8, 15, 22].includes(day) || (day === 29 && lastDay - 29 > 1) || day === lastDay;
   return (
-    <div className="day-bars" role="img" aria-label={`Оплати по днях за місяць, ${currency}`}>
+    <div className="day-bars" role="img" aria-label={ariaLabel}>
       {series.map((item) => (
         <span className="day-bar-slot" key={item.day}>
           <span
@@ -98,7 +100,6 @@ function StatusDiagram({ counts, total }: { counts: StatusCount[]; total: number
           <span className="status-count"><AnimatedCount value={count} /></span>
         </div>
       ))}
-      <p className="form-hint">Показано всі статуси, що є серед проєктів. Статуси без проєктів не ховаємо в загальну кількість — їх просто немає в списку.</p>
     </div>
   );
 }
@@ -243,21 +244,20 @@ export default function Home() {
           <p className="card-empty">У {monthLabel(month, "locative")} оплат ще не було.</p>
         )}
         <div className="overview-divider" />
-        <p className="overview-label">Очікувані доплати за проєктами (поточні, це ще не дохід)</p>
+        <p className="overview-label">Очікувані доплати</p>
         {expected.length > 0 ? (
           <div className="stat-rows">
             {expected.map((row) => (
               <div className="stat-row" key={row.currency}>
-                <span className="stat-currency">{row.currency}</span>
-                <strong className="stat-value muted">
+                <span className="stat-currency">
+                  {row.currency}
+                  <small className="stat-count">· {row.projects} {pluralProjects(row.projects)}</small>
+                </span>
+                <strong className="stat-value accent">
                   <AnimatedMoney minor={row.minor} currency={row.currency} />
                 </strong>
               </div>
             ))}
-            <p className="form-hint">
-              Проєкти з залишком: {expected.map((row) => `${row.currency} — ${row.projects}`).join(", ")}
-              {" "}· повна розбивка по сумах у фінансах.
-            </p>
           </div>
         ) : (
           <p className="card-empty">Усі оплати за активними проєктами надійшли.</p>
@@ -277,30 +277,28 @@ export default function Home() {
             </div>
           )}
         </div>
-        <DayBars series={daySeries} currency={activeCurrency} />
+        <DayBars series={daySeries} ariaLabel={`Оплати по днях за ${monthLabel(month, "accusative")}, ${activeCurrency}. Разом ${formatMoney(dayTotal, activeCurrency)}`} />
         {dayTotal > 0 ? (
           <>
             <p className="chart-total">
-              Разом за {monthLabel(month, "accusative")}:{" "}
+              <span>Разом за {monthLabel(month, "accusative")}</span>
               <strong>
                 <AnimatedMoney minor={dayTotal} currency={activeCurrency} />
               </strong>
-              <small>
-                {" "}· оплат у <AnimatedCount value={paidDays.length} /> з {daySeries.length} днів
-              </small>
             </p>
-            <ul className="chart-days">
-              {paidDays.map((item) => (
-                <li key={item.day}>
-                  {formatDay(`${month}-${String(item.day).padStart(2, "0")}`)} — {formatMoney(item.minor, activeCurrency)}
-                </li>
-              ))}
-            </ul>
+            <details className="chart-details">
+              <summary>Розбивка по днях</summary>
+              <ul className="chart-days">
+                {paidDays.map((item) => (
+                  <li key={item.day}>
+                    {formatDay(`${month}-${String(item.day).padStart(2, "0")}`)} — {formatMoney(item.minor, activeCurrency)}
+                  </li>
+                ))}
+              </ul>
+            </details>
           </>
         ) : (
-          <p className="card-empty">
-            У {monthLabel(month, "locative")} оплат у {activeCurrency} не було — дні без оплат показані порожніми. Оберіть інший місяць або валюту.
-          </p>
+          <p className="card-empty">У {monthLabel(month, "locative")} оплат у {activeCurrency} не було.</p>
         )}
       </section>
 
@@ -424,21 +422,23 @@ export default function Home() {
       <p className="demo-note">Демо-дані збережені локально в цьому браузері, база даних не підключена.</p>
 
       {projectOpen && (
-        <Sheet title="Новий проєкт" onClose={() => setProjectOpen(false)}>
+        <Sheet title="Новий проєкт" variant="form" onClose={() => setProjectOpen(false)}>
           <ProjectForm
             clients={state.clients}
-            onSubmit={(input: ProjectInput) => {
-              addProject(input);
+            onCreateClient={addClient}
+            onSubmit={({ project: input, prepaymentMinor }) => {
+              const { payment } = createProjectWithPrepayment({ addProject, addPayment }, input, prepaymentMinor);
               setProjectOpen(false);
               haptic("success");
-              notify("Проєкт створено");
+              notify(payment ? `Проєкт і передоплату ${formatMoney(payment.amountMinor, payment.currency)} записано` : "Проєкт створено");
             }}
           />
         </Sheet>
       )}
       {clientOpen && (
-        <Sheet title="Новий клієнт" onClose={() => setClientOpen(false)}>
+        <Sheet title="Новий клієнт" variant="form" onClose={() => setClientOpen(false)}>
           <ClientForm
+            existing={state.clients}
             onSubmit={(input: ClientInput) => {
               addClient(input);
               setClientOpen(false);
@@ -449,10 +449,11 @@ export default function Home() {
         </Sheet>
       )}
       {reminderOpen && (
-        <Sheet title="Нова справа" onClose={() => setReminderOpen(false)}>
+        <Sheet title="Нова справа" variant="form" onClose={() => setReminderOpen(false)}>
           <ReminderForm
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
+            onCreateClient={addClient}
             onSubmit={(input: ReminderInput) => {
               addReminder(input);
               setReminderOpen(false);
@@ -495,7 +496,7 @@ export default function Home() {
       )}
 
       {payFor && (
-        <Sheet title="Додати оплату" onClose={() => setPayFor(null)}>
+        <Sheet title="Додати оплату" variant="form" onClose={() => setPayFor(null)}>
           <div className="pay-context">
             <strong>{payFor.title}</strong>
             <small>

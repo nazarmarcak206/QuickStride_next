@@ -1,7 +1,9 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { applyViewportToDocument, clearViewportOverrides, watchViewport } from "@/lib/viewport";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -24,7 +26,25 @@ function unlockScroll() {
   lockedSheets = Math.max(0, lockedSheets - 1);
   if (lockedSheets === 0) {
     delete document.body.dataset.sheetOpen;
+    // Останній лист пішов — повертаємо фіксованим елементам повну висоту екрана.
+    clearViewportOverrides();
   }
+}
+
+// Імітуємо «прокрутити до видимого»: рухаємо лише власний скрол-контейнер
+// листа, а не сторінку. scrollIntoView на iOS тягне за собою document,
+// і сторінка під листом з'їжджає.
+function revealInContainer(element: HTMLElement, container: HTMLElement): void {
+  const center = () => {
+    if (!element.isConnected) return;
+    const box = container.getBoundingClientRect();
+    const spot = element.getBoundingClientRect();
+    const next = container.scrollTop + (spot.top - box.top) - (box.height - spot.height) / 2;
+    container.scrollTop = Math.max(0, next);
+  };
+  center();
+  // Клавіатура розкривається не миттєво — повторно центрємо після її анімації.
+  window.setTimeout(center, 320);
 }
 
 export type ToastHandle = { id: number; message: string };
@@ -46,13 +66,19 @@ export function Sheet({
   title,
   onClose,
   children,
+  variant = "compact",
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  // "form" — створення/редагування: на телефоні лист на майже весь екран.
+  // "compact" — короткі списки вибору: висота за вмістом.
+  variant?: "compact" | "form";
 }) {
   const sheetRef = useRef<HTMLElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const titleId = useId();
   // Фокус-повернення ловимо під час першого рендера: ефекти дітей (автофокус
   // на опції) працюють раніше за ефект шітки, тож у useEffect там уже опція.
   const openerRef = useRef<HTMLElement | null>(null);
@@ -70,6 +96,8 @@ export function Sheet({
     sheetStack.push(dismiss);
     lockScroll();
     const opener = openerRef.current;
+    // Геометрія видимої області (клавіатура, панелі браузера, Telegram WebView).
+    const stopWatching = watchViewport(applyViewportToDocument);
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape" && sheetStack[sheetStack.length - 1] === dismiss) {
@@ -105,6 +133,7 @@ export function Sheet({
     return () => {
       const index = sheetStack.indexOf(dismiss);
       if (index >= 0) sheetStack.splice(index, 1);
+      stopWatching();
       unlockScroll();
       window.removeEventListener("keydown", onKeyDown);
       // Повертаємо фокус на наступному тіку і лише коли його ніхто не
@@ -124,21 +153,27 @@ export function Sheet({
     };
   }, [dismiss]);
 
-  return (
+  // Лист живе в кінці <body>, а не там, де його викликали: форма проєкту не
+  // стає DOM-батьком другої форми, а фіксоване позиціонування не залежить від
+  // фільтрів і transform батьківських карток.
+  return createPortal(
     <div
-      className="sheet-backdrop"
+      className={`sheet-backdrop ${variant === "form" ? "is-form" : ""}`}
       onMouseDown={(event) => event.target === event.currentTarget && dismiss()}
+      // Подія submit іде до батьків по дереву React, тож форма всередині листа
+      // дісталася б ще й зовнішньої форми. Діалог — межа: далі не пускаємо.
+      onSubmit={(event) => event.stopPropagation()}
     >
       <section
         ref={sheetRef}
-        className="sheet"
+        className={`sheet ${variant === "form" ? "sheet-form" : ""}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={titleId}
         tabIndex={-1}
       >
         <header className="sheet-head">
-          <h2>{title}</h2>
+          <h2 id={titleId}>{title}</h2>
           <button
             type="button"
             className="icon-button"
@@ -148,9 +183,20 @@ export function Sheet({
             <X size={18} />
           </button>
         </header>
-        {children}
+        <div
+          className="sheet-body"
+          ref={bodyRef}
+          onFocus={(event) => {
+            const target = event.target as HTMLElement;
+            if (!["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || !bodyRef.current) return;
+            revealInContainer(target, bodyRef.current);
+          }}
+        >
+          {children}
+        </div>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

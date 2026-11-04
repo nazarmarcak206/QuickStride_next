@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { makeDemoState } from "./demoData";
 import { currentMonthKey, monthKey, shiftMonth } from "./money";
+import { migrateState } from "./migrate";
 import { canAddPayment, canChangeProjectCurrency, canUpdatePayment } from "./payments";
 import type { Client, CrmState, Currency, Payment, Project, Reminder } from "./types";
 
@@ -20,10 +21,10 @@ function loadState(): CrmState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as CrmState;
-      if (Array.isArray(parsed.clients) && Array.isArray(parsed.projects) && Array.isArray(parsed.payments) && Array.isArray(parsed.reminders)) {
-        return parsed;
-      }
+      // Міграція додає нові поля (зокрема тип клієнта) старим записам,
+      // не викидаючи й не об'єднуючи жодного з них.
+      const migrated = migrateState(JSON.parse(raw) as unknown);
+      if (migrated) return migrated;
     }
   } catch {
     // Пошкоджений localStorage — починаємо з демоданих.

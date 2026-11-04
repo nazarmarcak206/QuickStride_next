@@ -1,14 +1,25 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Archive, ArchiveRestore, AtSign, Briefcase, ChevronRight, Mail, Phone, Search, UserRound, Users } from "lucide-react";
+import { Archive, ArchiveRestore, AtSign, Briefcase, ChevronRight, Mail, Phone, Repeat, Search, UserRound, Users } from "lucide-react";
 import { EmptyState, Sheet, StatusPill, Toast, useToast } from "@/components/ui";
 import { ClientForm } from "@/components/forms";
-import { clientPaidByCurrency, clientProjects, clientSearchText, findDuplicateClient } from "@/lib/clients";
+import { clientKindLabel, clientPaidByCurrency, clientProjects, filterClients } from "@/lib/clients";
 import { formatMoney } from "@/lib/money";
+import { pluralPayments, pluralProjects } from "@/lib/text";
 import { projectReceivedMinor, useCrm } from "@/lib/store";
 import { haptic } from "@/lib/telegram";
-import type { Client } from "@/lib/types";
+import { CLIENT_KINDS, type Client, type ClientKind } from "@/lib/types";
+
+const kindStyle: Record<ClientKind, string> = {
+  "Постійний": "is-regular",
+  "Непостійний": "is-oneoff",
+};
+
+// Фільтр за типом: «не вказано» — окрема сходинка, бо старі записи без ознаки
+// не належать ані до постійних, ані до непостійних.
+const KIND_FILTERS = ["усі", ...CLIENT_KINDS, "не вказано"] as const;
+type KindFilter = (typeof KIND_FILTERS)[number];
 
 function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () => void }) {
   const { state, updateClient } = useCrm();
@@ -31,13 +42,12 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
 
   return (
     <>
-      <Sheet title={client.name} onClose={onClose}>
+      <Sheet title={editing ? "Редагувати клієнта" : client.name} variant={editing ? "form" : "compact"} onClose={onClose}>
         {editing ? (
           <ClientForm
             initial={client}
+            existing={state.clients}
             onSubmit={(input) => {
-              const duplicate = findDuplicateClient(state.clients, input.name, client.id);
-              if (duplicate && !window.confirm(`Клієнт зі схожим ім'ям уже є: «${duplicate.name}». Все одно зберегти?`)) return;
               updateClient(client.id, input);
               setEditing(false);
               haptic("success");
@@ -60,11 +70,21 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
                     <strong className="stat-value positive">{formatMoney(row.minor, row.currency)}</strong>
                   </div>
                 ))}
-                <p className="form-hint">Отримано за всіма проєктами клієнта · {paymentsCount} {paymentsCount === 1 ? "оплата" : "оплат"}</p>
+                <p className="form-hint">
+                  Разом отримано · {paymentsCount} {pluralPayments(paymentsCount)}
+                </p>
               </div>
             ) : (
               <p className="card-empty">Оплат від цього клієнта ще не було.</p>
             )}
+
+            <div className="kind-row">
+              <span className={`kind-tag ${client.kind ? kindStyle[client.kind] : "is-unknown"}`}>
+                {client.kind === "Постійний" ? <Repeat size={12} /> : <UserRound size={12} />}
+                {clientKindLabel(client.kind)}
+              </span>
+              {client.kind === null && <small>тип не задано</small>}
+            </div>
 
             <div className="fact-rows contacts">
               {client.company && (
@@ -112,7 +132,7 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
                 ))}
               </div>
             ) : (
-              <p className="card-empty">Проєктів із цим клієнтом поки немає — створіть їх у розділі «Проєкти».</p>
+              <p className="card-empty">Проєктів поки немає.</p>
             )}
 
             <div className="form-row">
@@ -124,7 +144,7 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
                 {client.archived ? "Повернути" : "В архів"}
               </button>
             </div>
-            {!client.archived && <p className="form-hint">Архівування сховає клієнта зі списку активних, але його проєкти й оплати залишаться.</p>}
+            {!client.archived && <p className="form-hint">Архівування ховає клієнта зі списку; проєкти й оплати залишаються.</p>}
           </div>
         )}
       </Sheet>
@@ -141,13 +161,12 @@ export default function Clients() {
   const [showArchived, setShowArchived] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    return state.clients
-      .filter((client) => (showArchived ? client.archived : !client.archived))
-      .filter((client) => !value || clientSearchText(client).includes(value))
-      .sort((a, b) => a.name.localeCompare(b.name, "uk"));
-  }, [state.clients, query, showArchived]);
+  const [kindFilter, setKindFilter] = useState<KindFilter>("усі");
+
+  const filtered = useMemo(
+    () => filterClients(state.clients, { query, archived: showArchived, kind: kindFilter }),
+    [state.clients, query, showArchived, kindFilter],
+  );
 
   const archivedCount = state.clients.filter((client) => client.archived).length;
   const openClient = openId ? state.clients.find((client) => client.id === openId) : null;
@@ -156,13 +175,26 @@ export default function Clients() {
     <div className="page-stack">
       <header className="page-head">
         <h1>Клієнти</h1>
-        <p className="page-sub">Контакти, проєкти й оплата — усе поруч.</p>
       </header>
 
       <label className="search-box">
         <Search size={16} />
         <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Ім’я, компанія, телефон, email…" />
       </label>
+
+      <div className="chip-row" role="group" aria-label="Фільтр за типом клієнта">
+        {KIND_FILTERS.map((kind) => (
+          <button
+            type="button"
+            key={kind}
+            className={`chip ${kindFilter === kind ? "active" : ""}`}
+            aria-pressed={kindFilter === kind}
+            onClick={() => setKindFilter(kind)}
+          >
+            {kind === "усі" ? "Усі типи" : kind === "не вказано" ? "Не вказано" : kind}
+          </button>
+        ))}
+      </div>
 
       <div className="chip-row" role="group" aria-label="Показ клієнтів">
         <button type="button" className={`chip ${!showArchived ? "active" : ""}`} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
@@ -192,7 +224,11 @@ export default function Clients() {
                     <small>{client.company || client.email || client.phone || "Без деталей"}</small>
                   </span>
                   <span className="client-side">
-                    <small>{projects.length > 0 ? `${projects.length} ${projects.length === 1 ? "проєкт" : projects.length < 5 ? "проєкти" : "проєктів"}` : "Новий"}</small>
+                    <small>{projects.length > 0 ? `${projects.length} ${pluralProjects(projects.length)}` : "Без проєктів"}</small>
+                    <span className={`kind-tag small ${client.kind ? kindStyle[client.kind] : "is-unknown"}`}>
+                      {client.kind === "Постійний" ? <Repeat size={11} /> : <UserRound size={11} />}
+                      {clientKindLabel(client.kind)}
+                    </span>
                     {client.archived && (
                       <small className="archived-mark">
                         <Archive size={11} /> архів
@@ -208,16 +244,16 @@ export default function Clients() {
       ) : (
         <EmptyState
           icon={<Users size={26} />}
-          title={query ? "Нікого не знайдено" : showArchived ? "Архів порожний" : "Клієнтів поки немає"}
+          title={query || kindFilter !== "усі" ? "Нікого не знайдено" : showArchived ? "Архів порожний" : "Клієнтів поки немає"}
           hint={
-            query
-              ? "Спробуйте інший запит — пошук працює за ім'ям, компанією, телефоном і email."
+            query || kindFilter !== "усі"
+              ? "Спробуйте інший запит або тип."
               : showArchived
-                ? "Заархівовані клієнти з'являться тут. Їхні проєкти й оплати зберігаються."
-                : "Додайте першого клієнта — проєкти й оплати будуть прив'язуватися до нього."
+                ? "Тут з'являться заархівовані клієнти."
+                : "Додайте першого клієнта."
           }
           action={
-            !query && !showArchived ? (
+            !query && !showArchived && kindFilter === "усі" ? (
               <button type="button" className="button-primary" onClick={() => setCreating(true)}>
                 Новий клієнт
               </button>
@@ -231,11 +267,10 @@ export default function Clients() {
       </button>
 
       {creating && (
-        <Sheet title="Новий клієнт" onClose={() => setCreating(false)}>
+        <Sheet title="Новий клієнт" variant="form" onClose={() => setCreating(false)}>
           <ClientForm
+            existing={state.clients}
             onSubmit={(input) => {
-              const duplicate = findDuplicateClient(state.clients, input.name);
-              if (duplicate && !window.confirm(`Схоже, «${duplicate.name}» уже є в базі. Дублікати не об'єднуються автоматично. Все одно додати?`)) return;
               addClient(input);
               setCreating(false);
               haptic("success");

@@ -97,11 +97,17 @@ export function overpayMinor(project: Project, receivedMinor: number): number {
 
 // Текст попередження до збереження. Точна сума та недоплата його не дають.
 export function overpayNotice(project: Project, afterMinor: number): string | null {
-  const over = afterMinor - project.amountMinor;
+  return overpayNoticeFor(project.amountMinor, project.currency, afterMinor);
+}
+
+// Той самий текст для ще не створеного проєкту: форма проєкту рахує передоплату
+// до того, як у запису з'явиться id.
+export function overpayNoticeFor(amountMinor: number, currency: Currency, afterMinor: number): string | null {
+  const over = afterMinor - amountMinor;
   if (over <= 0) return null;
   return (
-    `Переплата: ${formatMoney(afterMinor, project.currency)} проти погоджених ` +
-    `${formatMoney(project.amountMinor, project.currency)} — надлишок ${formatMoney(over, project.currency)}. ` +
+    `Переплата: ${formatMoney(afterMinor, currency)} проти погоджених ` +
+    `${formatMoney(amountMinor, currency)} — надлишок ${formatMoney(over, currency)}. ` +
     `Залишок лишиться 0, на інший проєкт сума не перейде. Записати все одно можна.`
   );
 }

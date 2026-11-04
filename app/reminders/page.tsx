@@ -27,7 +27,7 @@ function taskWhen(reminder: Reminder, today: string): string {
 }
 
 export default function Reminders() {
-  const { state, addReminder, updateReminder, toggleReminder, deleteReminder } = useCrm();
+  const { state, addClient, addReminder, updateReminder, toggleReminder, deleteReminder } = useCrm();
   const { toast, notify } = useToast();
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Reminder | null>(null);
@@ -120,14 +120,13 @@ export default function Reminders() {
     <div className="page-stack">
       <header className="page-head">
         <h1>Справи</h1>
-        <p className="page-sub">Нагадування, які тримають проєкти в русі.</p>
       </header>
 
       {!hasAny ? (
         <EmptyState
           icon={<Bell size={26} />}
           title="Справ поки немає"
-          hint="Створіть першу справу — пізніше бот нагадуватиме про неї в чаті."
+          hint="Створіть першу справу — бот нагадає про неї."
           action={
             <button type="button" className="button-primary" onClick={() => setCreating(true)}>
               <Plus size={15} /> Нова справа
@@ -173,10 +172,11 @@ export default function Reminders() {
       </button>
 
       {creating && (
-        <Sheet title="Нова справа" onClose={() => setCreating(false)}>
+        <Sheet title="Нова справа" variant="form" onClose={() => setCreating(false)}>
           <ReminderForm
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
+            onCreateClient={addClient}
             onSubmit={(input) => {
               addReminder(input);
               setCreating(false);
@@ -188,7 +188,7 @@ export default function Reminders() {
       )}
 
       {editing && (
-        <Sheet title="Редагувати справу" onClose={() => setEditing(null)}>
+        <Sheet title="Редагувати справу" variant="form" onClose={() => setEditing(null)}>
           <ReminderForm
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
