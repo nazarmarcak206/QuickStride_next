@@ -1,0 +1,880 @@
+
+
+/* QuickStride CRM — брендова палітра (джерело істини: ../Бренд і документи/Дизайн і кольори.md)
+   Graphite #211D1B · Orange #FF7A2F · Warm White #F7F2EC · Sand #E9DDD1 · Coral #F26950
+   Єдина фірмова тема: теплий графітовий фон, світліші скляні картки, кремовий текст,
+   оранжеві акценти. Світла/темна перемикання більше немає. */
+
+:root {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Inter", "Helvetica Neue", sans-serif;
+  color-scheme: dark;
+  --graphite: #211d1b;
+  --orange: #ff7a2f;
+  --warm-white: #f7f2ec;
+  --sand: #e9ddd1;
+  --coral: #f26950;
+
+  --bg: #211d1b;
+  --surface: #2c2622;
+  --surface-soft: #37302b;
+  --ink: var(--warm-white);
+  --ink-soft: #dcd4cb;
+  --muted: #a99c90;
+  --line: #463e37;
+  --accent: var(--orange);
+  --accent-ink: var(--graphite);
+  --accent-soft: #4a3322;
+  --positive: #7fce9f;
+  --danger: #ff8d76;
+  --shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+  --radius: 16px;
+  --nav-h: 62px;
+
+  /* Рух: короткий і м'який. Прес — миттєвий відгук, лист — плавне гальмування. */
+  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-sheet: cubic-bezier(0.22, 1, 0.36, 1);
+  --press-ms: 120ms;
+
+  /* Рідке скло: напівпрозорі поверхні + розмиття + відблиск по верхній грані */
+  --glass: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass-strong: color-mix(in srgb, var(--surface) 92%, transparent);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.1);
+  --glass-blur: saturate(160%) blur(18px);
+  --glass-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  --glow-a: rgba(255, 122, 47, 0.1);
+  --glow-b: rgba(242, 105, 80, 0.08);
+  --glow-c: rgba(233, 221, 209, 0.07);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  transition: background 0.22s ease, color 0.22s ease;
+  -webkit-font-smoothing: antialiased;
+}
+/* Багатошарова глибина: м'які фірмові світлові плями за скляними поверхнями.
+   Шар нерухомий і декоративний — контент завжди над ним. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 34% at 18% 12%, var(--glow-a), transparent 70%),
+    radial-gradient(46% 38% at 86% 26%, var(--glow-b), transparent 72%),
+    radial-gradient(60% 52% at 50% 100%, var(--glow-c), transparent 76%);
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+/* Клавіатурний фокус у межах діалогу не малює рамки навколо всього листа */
+.sheet:focus { outline: none; }
+/* Під час відкритого листа фон не скролиться — інак жест «пролітає» повз лист */
+body[data-sheet-open] { overflow: hidden; }
+h1, h2, h3 { margin: 0; }
+p { margin: 0; }
+
+/* --- Каркас ------------------------------------------------------------ */
+.app { min-height: 100vh; max-width: 520px; margin: 0 auto; padding: 0 16px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 28px); }
+.page { padding-top: 8px; position: relative; animation: page-in 0.16s ease-out; }
+/* Зсув появи йде через top, а не transform: будь-який transform (навіть 4 px
+   на один кадр) робить .page контейнерним блоком для position:fixed — плаваюча
+   кнопка та нижні листи під час анімації стрибали б від верху сторінки.
+   Без fill-mode: залишений стан теж прилипав би до сторінки. */
+@keyframes page-in { from { opacity: 0; top: 4px; } to { opacity: 1; top: 0; } }
+.page-stack { display: flex; flex-direction: column; gap: 14px; }
+.page-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.4px; }
+.page-sub { color: var(--muted); font-size: 14px; margin-top: 3px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between;
+  margin: 0 -16px; padding: calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--glass-border);
+}
+.brand { display: inline-flex; align-items: center; gap: 9px; text-decoration: none; color: var(--ink); }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 9px;
+  background: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.brand-mark::after { content: "Q"; color: var(--accent-ink); font-weight: 800; font-size: 15px; }
+.brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
+.topbar-actions { display: flex; align-items: center; gap: 6px; }
+.topbar-actions svg { transition: transform 0.2s var(--ease-sheet); }
+.icon-button[aria-expanded="true"] svg { transform: rotate(60deg); }
+
+.icon-button {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; border-radius: 11px;
+  border: 0; background: transparent; color: var(--ink-soft);
+  transition: transform var(--press-ms) var(--ease-press), background var(--press-ms) ease, color var(--press-ms) ease;
+}
+/* Невидиме розширення зони натискання до 44px без зміни верстки */
+.icon-button::before { content: ""; position: absolute; inset: -4px; border-radius: inherit; }
+.icon-button:active { transform: scale(0.88); background: var(--surface-soft); }
+.icon-button:disabled { opacity: 0.35; cursor: default; transform: none; }
+@media (hover: hover) {
+  .icon-button:hover { background: var(--surface-soft); }
+}
+
+.more-menu {
+  position: relative; z-index: 15; margin-top: 10px;
+  padding: 14px; border-radius: 20px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  animation: menu-in 0.18s var(--ease-sheet);
+}
+@keyframes menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+/* --- Нижня навігація: плаваюча скляна панель ---------------------------- */
+.bottom-nav {
+  position: fixed; bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  left: 50%; transform: translateX(-50%);
+  width: calc(100% - 28px); max-width: 492px; z-index: 30;
+  display: flex; justify-content: space-around; align-items: stretch;
+  padding: 7px 8px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 26px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  isolation: isolate;
+}
+/* Пігулка-індикатор: окреме «скло» під активним пунктом, що пливе на пружині
+   (позицію і деформацію веде BottomNav у JS; тут тільки вигляд). */
+.bottom-nav-pill {
+  position: absolute; top: 7px; bottom: 7px; left: 0; width: 0;
+  z-index: 0; pointer-events: none; will-change: transform;
+  border-radius: 19px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 20%, transparent),
+    color-mix(in srgb, var(--accent) 9%, transparent)
+  );
+  -webkit-backdrop-filter: saturate(190%) blur(24px);
+  backdrop-filter: saturate(190%) blur(24px);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 6px 18px color-mix(in srgb, var(--accent) 20%, transparent);
+  visibility: hidden;
+}
+/* Відблиск по верхній грані пігулки — тонка «оптична» лінія, як у скла */
+.bottom-nav-pill::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, #ffffff 42%, transparent) 0%,
+    transparent 34%,
+    transparent 74%,
+    color-mix(in srgb, var(--accent) 14%, transparent) 100%
+  );
+}
+.bottom-nav.has-active .bottom-nav-pill { visibility: visible; }
+.bottom-nav-item {
+  position: relative; z-index: 1;
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 8px 2px; border: 0; border-radius: 18px; background: transparent;
+  text-decoration: none; color: var(--muted); font-size: 11px; font-weight: 500;
+  transition: color 0.2s ease, transform var(--press-ms) var(--ease-press);
+}
+.bottom-nav-item:active { transform: scale(0.92); }
+.bottom-nav-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bottom-nav-item:hover { color: var(--ink-soft); }
+.bottom-nav-item.active { color: var(--accent); }
+.bottom-nav-item:focus-visible { outline-offset: -3px; }
+@media (max-width: 360px) {
+  .bottom-nav-item { font-size: 10px; }
+  .bottom-nav-item svg { width: 19px; height: 19px; }
+}
+
+/* --- Картки і секції ---------------------------------------------------- */
+.card {
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-highlight);
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.card-head h2 { font-size: 16px; font-weight: 600; }
+.card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.card-empty { color: var(--muted); font-size: 14px; line-height: 1.45; }
+.count-bubble {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 700;
+}
+.count-bubble.small { min-width: 19px; height: 19px; font-size: 11px; }
+.text-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 0; background: transparent; color: var(--accent);
+  font-size: 13px; font-weight: 600; padding: 4px;
+  transition: opacity var(--press-ms) ease, transform var(--press-ms) var(--ease-press);
+}
+.text-link:active { opacity: 0.6; transform: scale(0.96); }
+.text-link svg { transition: transform var(--press-ms) var(--ease-press); }
+@media (hover: hover) {
+  .text-link:hover svg { transform: translateX(2px); }
+}
+.section-title { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+
+/* --- Головна ------------------------------------------------------------ */
+.hero-card h2 { font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.hero-amount { display: block; font-size: 30px; font-weight: 800; letter-spacing: -0.8px; }
+.hero-expected { margin-top: 8px; font-size: 14px; color: var(--ink-soft); }
+.hero-expected strong { color: var(--accent); }
+.button-ghost {
+  margin-top: 12px; display: inline-flex; align-items: center; gap: 6px;
+  border: 0; background: transparent; color: var(--accent); font-weight: 600; font-size: 14px; padding: 4px 0;
+}
+/* Швидкі дії — блок створення записів, а не дубль нижньої навігації:
+   маленький «+» на іконці каже, що дія додає запис, а не переходить. */
+.quick-add { display: flex; flex-direction: column; gap: 8px; }
+.quick-add-title {
+  font-size: 13px; font-weight: 700; letter-spacing: 0.2px;
+  color: var(--muted); padding-left: 2px;
+}
+.quick-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.quick-tile {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  min-height: 60px; padding: 9px 4px;
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--ink); font-size: 11.5px; font-weight: 600;
+  box-shadow: var(--shadow), inset 0 1px 0 var(--glass-highlight);
+  transition: transform 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.quick-tile:active { transform: scale(0.95); background: var(--surface-soft); }
+.quick-icon {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; color: var(--accent);
+}
+.quick-badge {
+  position: absolute; top: -5px; right: -8px;
+  width: 14px; height: 14px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.quick-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Вузький екран: підписи не мають тіснитися — розгортаємо в 2×2 */
+@media (max-width: 339px) {
+  .quick-grid { grid-template-columns: repeat(2, 1fr); }
+  .quick-tile { font-size: 12.5px; }
+}
+.mini-list { display: flex; flex-direction: column; }
+.mini-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14px;
+}
+.mini-row:last-child { border-bottom: 0; }
+.mini-time { min-width: 52px; color: var(--accent); font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+.mini-title { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.mini-title small { color: var(--muted); font-size: 12px; margin-top: 1px; }
+.demo-note { color: var(--muted); font-size: 12px; text-align: center; padding: 4px 0 8px; }
+
+/* --- Кнопки -------------------------------------------------------------- */
+.button-primary, .button-secondary, .button-danger {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 12px 18px; border-radius: 13px; border: 0;
+  font-weight: 600; font-size: 15px;
+  transition: transform var(--press-ms) var(--ease-press), background var(--press-ms) ease,
+    border-color var(--press-ms) ease, opacity var(--press-ms) ease;
+}
+.button-primary { background: var(--accent); color: var(--accent-ink); }
+.button-primary:disabled { opacity: 0.5; cursor: default; }
+.button-primary.wide { width: 100%; margin-top: 12px; }
+.button-secondary { background: var(--surface-soft); border: 1px solid var(--line); color: var(--ink); flex: 1; }
+.button-danger { background: transparent; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); flex: 1; }
+/* Прес — миттєвий відгук без очікування відповіді від стану */
+.button-primary:active:not(:disabled),
+.button-secondary:active:not(:disabled),
+.button-danger:active:not(:disabled) { transform: scale(0.975); }
+.button-primary:active:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #000); }
+.button-secondary:active:not(:disabled) { background: var(--surface); }
+.button-danger:active:not(:disabled) { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+@media (hover: hover) {
+  .button-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, #ffffff); }
+  .button-secondary:hover:not(:disabled) { border-color: var(--muted); }
+  .button-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+}
+.fab {
+  position: fixed; right: calc(50% - 260px + 16px); bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 32px);
+  width: 54px; height: 54px; border-radius: 50%; border: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, #ffffff 8%), var(--accent));
+  color: var(--accent-ink);
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 42%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform var(--press-ms) var(--ease-press), box-shadow var(--press-ms) ease;
+  z-index: 25;
+}
+.fab:active { transform: scale(0.92); box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+@media (hover: hover) {
+  .fab:hover { transform: translateY(-1px); }
+}
+@media (max-width: 540px) { .fab { right: 16px; } }
+
+/* --- Пошук, чіпи, фільтри ------------------------------------------------ */
+.search-box {
+  display: flex; align-items: center; gap: 9px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border); border-radius: 14px;
+  padding: 11px 14px; color: var(--muted);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+.search-box input { flex: 1; border: 0; background: transparent; outline: none; color: var(--ink); min-width: 0; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.chip-row.scroll-x { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.chip {
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+  border-radius: 999px; padding: 7px 13px; font-size: 13px; font-weight: 500; white-space: nowrap;
+  transition: transform var(--press-ms) var(--ease-press), background var(--press-ms) ease,
+    color var(--press-ms) ease, border-color var(--press-ms) ease;
+}
+.chip:active { transform: scale(0.94); }
+.chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+@media (hover: hover) {
+  .chip:hover:not(.active) { border-color: var(--muted); color: var(--ink); }
+}
+
+/* --- Списки проєктів, клієнтів, оплат ------------------------------------ */
+.project-list, .client-list, .payment-list { display: flex; flex-direction: column; }
+.project-row, .client-row {
+  display: flex; align-items: center; gap: 11px; width: 100%;
+  padding: 12px 6px; margin: 0 -6px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; text-align: left; border-radius: 12px;
+  transition: background var(--press-ms) ease, transform var(--press-ms) var(--ease-press);
+}
+/* Прес рядка — затемнення комірки: відчуття «натиснуто», без стриборка */
+.project-row:active, .client-row:active {
+  background: color-mix(in srgb, var(--surface-soft) 70%, transparent);
+  transform: scale(0.995);
+}
+.project-row:last-child, .client-row:last-child, .payment-row:last-child { border-bottom: 0; }
+.project-main { flex: 1; display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.project-main strong { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-main small { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.project-money { color: var(--ink-soft); font-size: 12px; font-variant-numeric: tabular-nums; }
+.client-side small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.row-chevron { color: var(--muted); flex-shrink: 0; }
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 700;
+}
+.payment-row {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 11px 6px; margin: 0 -6px; border: 0; border-bottom: 1px solid var(--line);
+  background: transparent; text-align: left; border-radius: 12px;
+  transition: background var(--press-ms) ease;
+}
+.payment-row:not(.static):active { background: color-mix(in srgb, var(--surface-soft) 70%, transparent); }
+.payment-row.static { cursor: default; }
+.payment-icon {
+  width: 34px; height: 34px; border-radius: 11px; flex-shrink: 0;
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.payment-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.payment-main strong { font-size: 14.5px; font-weight: 600; }
+.payment-main small { color: var(--muted); font-size: 12.5px; }
+.payment-amount { font-size: 14.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- Детальний екран проєкту --------------------------------------------- */
+.detail-page { min-height: 100vh; margin: 0 -16px; padding: 0 16px calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 30px); }
+.detail-head {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 0 10px;
+  background: var(--glass);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.detail-head h1 { font-size: 17px; font-weight: 700; flex: 1; text-align: center; }
+.detail-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+.detail-title-row h2 { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; }
+.detail-client { color: var(--accent); font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+.detail-desc { color: var(--ink-soft); font-size: 14px; line-height: 1.5; }
+.fact-rows { display: flex; flex-direction: column; gap: 7px; margin-top: 12px; font-size: 14px; color: var(--ink-soft); }
+.fact-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fact-row strong { color: var(--ink); }
+.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; }
+.summary-grid small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+.summary-grid strong { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.finance-summary {
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--surface) 45%, transparent),
+    color-mix(in srgb, var(--accent-soft) 60%, transparent)
+  );
+}
+.positive { color: var(--positive); }
+.accent { color: var(--accent); }
+
+.inline-edit { display: flex; flex-direction: column; gap: 10px; flex: 1; width: 100%; padding: 6px 0; }
+/* Перекреслення: лінія малюється швидко, рядок гасне й «іде» в свій бік */
+.task-title-text { position: relative; display: inline; transition: color 0.2s ease; }
+.task-title-text::after { content: ""; position: absolute; left: 0; right: 0; top: 52%; height: 1.5px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform 0.26s var(--ease-sheet); }
+.task-row.is-done .task-title-text, .task-row.is-completing .task-title-text { color: var(--muted); }
+.task-row.is-done .task-title-text::after, .task-row.is-completing .task-title-text::after { transform: scaleX(1); }
+.task-row.is-completing { animation: task-complete 0.48s ease both; }
+@keyframes task-complete {
+  0% { opacity: 1; transform: translateX(0); }
+  45% { opacity: 0.9; }
+  100% { opacity: 0.32; transform: translateX(4px); }
+}
+.check-button {
+  position: relative;
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--line); background: transparent; color: var(--accent-ink);
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.16s ease, border-color 0.16s ease, transform 0.16s var(--ease-press);
+}
+/* Зона натискання 42px при видимому кружку 26px */
+.check-button::before { content: ""; position: absolute; inset: -8px; border-radius: 50%; }
+.check-button:active { transform: scale(0.88); }
+.check-button.checked { background: var(--positive); border-color: var(--positive); animation: tick-pop 0.22s var(--ease-press); }
+@keyframes tick-pop { from { transform: scale(0.82); } 60% { transform: scale(1.06); } to { transform: scale(1); } }
+.check-button svg { animation: tick-draw 0.2s var(--ease-sheet) both; }
+@keyframes tick-draw { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+
+/* --- Статуси -------------------------------------------------------------- */
+.status-pill {
+  display: inline-flex; align-items: center;
+  padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.pill-new { background: var(--accent-soft); color: var(--accent); }
+.pill-talk { background: color-mix(in srgb, var(--coral) 16%, transparent); color: var(--coral); }
+.pill-active { background: color-mix(in srgb, var(--positive) 16%, transparent); color: var(--positive); }
+.pill-waiting { background: color-mix(in srgb, #d9a13c 18%, transparent); color: #ecc06a; }
+.pill-done { background: color-mix(in srgb, var(--muted) 18%, transparent); color: var(--ink-soft); }
+.pill-cancelled { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+
+/* --- Фінанси --------------------------------------------------------------- */
+.stat-rows { display: flex; flex-direction: column; gap: 8px; }
+.stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.stat-currency { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: 0.4px; }
+.stat-value { font-size: 22px; font-weight: 800; letter-spacing: -0.4px; font-variant-numeric: tabular-nums; }
+.stat-value.accent { color: var(--accent); }
+.expected-group { display: flex; flex-direction: column; gap: 4px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.expected-group:last-of-type { border-bottom: 0; }
+.expected-project { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--ink-soft); padding-left: 4px; }
+.expected-project strong { font-variant-numeric: tabular-nums; color: var(--ink); }
+/* «Показати всі» для скороченого списку + пояснення прихованих рядків */
+.show-all {
+  align-self: flex-start; margin-top: 2px;
+  border: 0; background: transparent; padding: 4px 0;
+  color: var(--accent); font-size: 13.5px; font-weight: 700;
+  transition: opacity var(--press-ms) ease, transform var(--press-ms) var(--ease-press);
+}
+.show-all:active { transform: scale(0.98); opacity: 0.8; }
+@media (hover: hover) {
+  .show-all:hover { text-decoration: underline; }
+}
+/* Записи в іншій валюті: показуємо окремо, бо вони не входять у загальну суму проєкту */
+.foreign-currency,
+.overpay-note {
+  display: flex; align-items: flex-start; gap: 6px;
+  color: var(--danger); font-size: 12.5px; line-height: 1.45; font-weight: 500;
+}
+.foreign-currency svg,
+.overpay-note svg { flex-shrink: 0; margin-top: 2px; }
+.payment-main .foreign-currency { display: block; }
+.month-switcher { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.month-switcher strong { font-size: 15px; }
+.month-bars { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; height: 150px; padding-top: 18px; }
+.month-bar-slot { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; height: 100%; }
+.month-bar { width: 100%; max-width: 34px; border-radius: 8px 8px 3px 3px; background: color-mix(in srgb, var(--accent) 55%, var(--sand)); }
+.month-bar.is-current { background: var(--accent); }
+.month-bar-value { font-size: 10px; color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.month-bar-label { font-size: 11px; color: var(--muted); }
+
+/* --- Форми і шітки ---------------------------------------------------------- */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(12, 9, 7, 0.55);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: backdrop-in 0.18s ease;
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+.sheet {
+  width: 100%; max-width: 520px; max-height: 88vh; overflow-y: auto;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  color: var(--ink);
+  border-radius: 24px 24px 0 0; padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 18px);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  will-change: transform;
+  animation: sheet-up 0.24s var(--ease-sheet);
+}
+@keyframes sheet-up { from { transform: translateY(28px); opacity: 0.4; } to { transform: translateY(0); opacity: 1; } }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sheet-head h2 { font-size: 18px; font-weight: 700; }
+.form-stack { display: flex; flex-direction: column; gap: 12px; }
+.form-row { display: flex; gap: 10px; align-items: flex-end; }
+.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); flex: 1; min-width: 0; }
+.field input, .field textarea {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-soft); color: var(--ink);
+  padding: 11px 12px; font-size: 15px; font-weight: 400; width: 100%;
+  transition: border-color var(--press-ms) ease, box-shadow var(--press-ms) ease;
+}
+.field input:focus-visible, .field textarea:focus-visible { border-color: var(--accent); }
+.field input::placeholder, .field textarea::placeholder { color: color-mix(in srgb, var(--muted) 80%, transparent); }
+
+/* Поле вибору: вигляд як у решти полів, відкривається фірмовим нижнім листом */
+.picker-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; text-align: left;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--surface-soft); color: var(--ink);
+  padding: 11px 12px; font-size: 15px; font-weight: 400;
+  transition: border-color var(--press-ms) ease, background var(--press-ms) ease,
+    transform var(--press-ms) var(--ease-press);
+}
+.picker-trigger:active {
+  transform: scale(0.99);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--surface-soft) 82%, var(--accent-soft));
+}
+@media (hover: hover) {
+  .picker-trigger:hover { border-color: var(--muted); }
+}
+.picker-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker-value.is-placeholder { color: var(--muted); }
+/* Незмінне поле (валюта оплати дорівнює валюті проєкту) — вигляд як у вибору, без натискання */
+.picker-static,
+.picker-trigger.is-disabled {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: color-mix(in srgb, var(--muted) 18%, var(--surface-soft));
+  color: var(--ink-soft); padding: 11px 12px; font-size: 15px; font-weight: 600;
+}
+.picker-static { display: flex; align-items: center; }
+.picker-trigger.is-disabled { cursor: default; }
+.picker-trigger.is-disabled:active { transform: none; border-color: var(--line); }
+@media (hover: hover) {
+  .picker-trigger.is-disabled:hover { border-color: var(--line); }
+}
+.picker-chevron { color: var(--muted); flex-shrink: 0; transition: transform 0.16s var(--ease-press), color 0.16s ease; }
+.picker-trigger[aria-expanded="true"] .picker-chevron { transform: rotate(180deg); color: var(--accent); }
+.picker-trigger[aria-expanded="true"] { border-color: var(--accent); }
+.form-hint { color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+/* Попередження до збереження: неуважність, а не заборона — кнопка лишається активна. */
+.form-warn {
+  display: flex; align-items: flex-start; gap: 6px;
+  color: var(--danger); font-size: 12.5px; line-height: 1.45; font-weight: 500;
+  padding: 9px 11px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-soft));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  border-radius: 12px;
+}
+.form-warn svg { flex-shrink: 0; margin-top: 2px; }
+.reset-card { display: flex; flex-direction: column; gap: 8px; }
+.reset-title { font-weight: 700; font-size: 15px; }
+.reset-text { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.reset-card .button-secondary { flex: none; align-self: flex-start; }
+
+/* --- Порожні стани, тости ------------------------------------------------------ */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center; padding: 36px 20px;
+  background: var(--surface); border: 1px dashed var(--line); border-radius: var(--radius);
+}
+.empty-icon {
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.empty-state strong { font-size: 16px; }
+.empty-state p { color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 280px; }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 34px);
+  z-index: 60;
+  background: var(--surface-soft); color: var(--warm-white);
+  padding: 11px 18px; border-radius: 13px; font-size: 14px; font-weight: 500;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), inset 0 1px 0 var(--glass-highlight);
+  animation: toast-in 0.18s var(--ease-sheet);
+}
+.toast.is-leaving { animation: toast-out 0.22s ease forwards; }
+@keyframes toast-in { from { transform: translate(-50%, 10px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+@keyframes toast-out { to { transform: translate(-50%, 6px); opacity: 0; } }
+
+/* --- Splash: поява логотипа крізь рідке скло (тільки при повному завантаженні) ---
+   pointer-events: none — застосунок залишається інтерактивним під час анімації.
+   Safety-анімація ховає оверлей, навіть якщо JS не виконався; при вимкненому JS
+   його також ховає <noscript>-стиль з AppShell. */
+.qs-splash {
+  position: fixed; inset: 0; z-index: 100;
+  pointer-events: none;
+  background: var(--bg);
+  animation: qs-splash-safety 0.4s ease 3s forwards;
+}
+.qs-splash[data-phase="fade"] {
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+@keyframes qs-splash-safety { to { opacity: 0; visibility: hidden; } }
+
+/* --- Доступність і рух ------------------------------------------------------------
+   reduce: жодних анімацій появи й прес-зміщень. Кольоровий відгук натискання
+   лишається, тож кнопки не стають «мертвими». Пігулка навігації рухається через
+   JS-пружину (BottomNav сам її зупиняє), тому transform усюди не чіпаємо. */
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  .button-primary:active:not(:disabled),
+  .button-secondary:active:not(:disabled),
+  .button-danger:active:not(:disabled),
+  .quick-tile:active, .chip:active, .icon-button:active, .fab:active,
+  .check-button:active, .status-option:active, .picker-trigger:active,
+  .bottom-nav-item:active, .segment button:active, .text-link:active,
+  .status-button:active, .project-row:active, .client-row:active { transform: none; }
+}
+
+/* Запасний вигляд без розмиття: поверхні стають щільними, контент читається.
+   Стосується всіх скляних елементів одразу. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .topbar, .bottom-nav, .card, .quick-tile, .sheet, .more-menu {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .bottom-nav, .card, .quick-tile, .sheet, .more-menu { border-color: var(--line); }
+  /* Пігулка без розмиття: щільніший акцентний тон, щоб активний пункт читався */
+  .bottom-nav-pill {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  }
+}
+@media (min-width: 560px) {
+  .app { padding-top: 6px; }
+}
+
+/* --- Стан завантаження (до гідратації localStorage) ------------------------- */
+.boot {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; color: var(--muted); font-size: 15px;
+}
+
+/* --- Дашборд: фінансовий огляд ---------------------------------------------- */
+.overview-label {
+  font-size: 13px; font-weight: 600; color: var(--muted);
+  margin: 10px 0 6px; display: flex; align-items: center; gap: 5px;
+}
+.overview-label.warn { color: var(--danger); }
+.overview-divider { border-top: 1px dashed var(--line); margin-top: 14px; }
+.stat-value.muted { color: var(--ink-soft); }
+
+/* --- Дашборд: денний графік --------------------------------------------------- */
+.day-bars {
+  display: flex; align-items: flex-end; gap: 2px;
+  height: 92px; padding-top: 8px; margin-bottom: 8px;
+}
+.day-bar-slot {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-end; gap: 4px; height: 100%;
+}
+.day-bar { width: 100%; min-width: 2px; border-radius: 3px 3px 1px 1px; background: transparent; }
+.day-bar.filled { background: var(--accent); }
+.day-bar-slot i { font-style: normal; font-size: 9px; color: var(--muted); }
+.chart-total { font-size: 14px; color: var(--ink-soft); margin: 4px 0 8px; }
+.chart-total strong { font-size: 16px; color: var(--ink); }
+.chart-total small { color: var(--muted); font-size: 12px; }
+.chart-days { margin: 0; padding: 0 0 0 4px; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.chart-days li { font-size: 13px; color: var(--ink-soft); border-bottom: 1px dashed var(--line); padding-bottom: 4px; }
+.chart-days li:last-child { border-bottom: 0; }
+
+/* --- Дашборд: статуси проєктів ------------------------------------------------- */
+.status-diagram { display: flex; flex-direction: column; gap: 8px; }
+.status-row { display: flex; align-items: center; gap: 10px; }
+.status-name { min-width: 118px; font-size: 13px; color: var(--ink-soft); }
+.status-track { flex: 1; height: 10px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; }
+.status-bar { display: block; height: 100%; border-radius: 999px; }
+.bar-accent { background: var(--accent); }
+.bar-coral { background: var(--coral); }
+.bar-positive { background: var(--positive); }
+.bar-muted { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.bar-danger { background: color-mix(in srgb, var(--danger) 60%, transparent); }
+.status-count { min-width: 20px; text-align: right; font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+
+/* --- Анімація графіків -------------------------------------------------------
+   Стовпчики виростають лише тоді, коли splash відпустив сторінку (воронка
+   lib/pageReveal.ts), інакше анімація проходила б під оверлеєм. При перемиканні
+   періоду чи валюти ті самі елементи лишаються на місці й плавно змінюють
+   розмір через transition — тому анімація появи не перезапускається на кожен
+   ререндер. При prefers-reduced-motion блоку нижче знімає й анімації, й переходи. */
+.day-bar, .month-bar {
+  transform-origin: bottom;
+  transition: height 0.3s var(--ease-press);
+  animation: bar-grow 0.45s var(--ease-sheet) backwards;
+  animation-play-state: paused;
+}
+.status-bar {
+  transition: width 0.3s var(--ease-press);
+  animation: bar-grow-width 0.45s var(--ease-sheet) backwards;
+  animation-play-state: paused;
+}
+.day-bars, .month-bars, .status-diagram {
+  animation: chart-in 0.32s ease-out backwards;
+  animation-play-state: paused;
+}
+body[data-page-revealed] .day-bar,
+body[data-page-revealed] .month-bar,
+body[data-page-revealed] .status-bar,
+body[data-page-revealed] .day-bars,
+body[data-page-revealed] .month-bars,
+body[data-page-revealed] .status-diagram { animation-play-state: running; }
+@keyframes bar-grow { from { transform: scaleY(0); } }
+@keyframes bar-grow-width { from { width: 0; } }
+@keyframes chart-in { from { opacity: 0.25; } }
+
+/* Значення під час лічби приховане від скринрідера, фінальне — тут. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
+}
+
+@media (max-width: 360px) {
+  .status-name { min-width: 100px; font-size: 12px; }
+}
+
+/* --- Клієнти ------------------------------------------------------------------ */
+.client-list .client-row { padding: 13px 2px; }
+.client-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.archived-mark {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--muted); font-size: 11px; font-weight: 600;
+}
+.paid-block { padding: 4px 0 2px; }
+.fact-rows.contacts { margin-top: 4px; }
+.fact-rows.contacts .fact-row { color: var(--ink); gap: 8px; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.fact-rows.contacts .fact-row:last-child { border-bottom: 0; }
+.fact-rows.contacts svg { color: var(--accent); flex-shrink: 0; }
+.archived-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 9px 12px; border-radius: 12px; margin-bottom: 10px;
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  color: var(--ink-soft); font-size: 13px; font-weight: 500;
+}
+
+/* --- Картка проєкту: статус, прогрес оплати --------------------------------- */
+.status-button {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; background: transparent; padding: 2px 0;
+  margin: 2px 0 6px;
+  transition: transform var(--press-ms) var(--ease-press), opacity var(--press-ms) ease;
+}
+.status-button:active { transform: scale(0.97); opacity: 0.8; }
+.status-button-hint {
+  display: inline-flex; align-items: center; gap: 2px;
+  color: var(--muted); font-size: 12px; font-weight: 500;
+}
+.status-button:active .status-button-hint svg { transform: translateY(1px); }
+.status-button-hint svg { transition: transform var(--press-ms) var(--ease-press); }
+.fact-row span:not(.fact-icon) { color: var(--muted); }
+.pay-progress { margin-top: 14px; }
+.pay-progress-track {
+  display: block; height: 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 22%, transparent);
+  overflow: hidden;
+}
+.pay-progress-fill {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 70%, var(--positive)), var(--positive));
+  transition: width 0.35s ease;
+}
+.pay-progress-label { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; font-weight: 600; }
+.payment-type { color: var(--accent); font-weight: 700; }
+.empty-inline {
+  display: flex; align-items: flex-start; gap: 10px;
+  color: var(--muted); font-size: 14px; line-height: 1.5;
+  padding: 10px 0 4px;
+}
+.empty-inline svg { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+/* --- Вибір: нижній лист з великими варіантами (статус, валюта, клієнт…) ---- */
+.status-picker { display: flex; flex-direction: column; gap: 8px; }
+.status-option {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px 14px; border-radius: 16px;
+  border: 1px solid var(--line); background: var(--surface-soft);
+  text-align: left;
+  transition: transform 0.12s var(--ease-press), border-color 0.12s ease, background 0.12s ease;
+}
+.status-option:active { transform: scale(0.98); background: color-mix(in srgb, var(--surface-soft) 78%, var(--accent-soft)); }
+.status-option.selected { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: var(--accent-soft); }
+.status-option:focus-visible { outline-offset: -3px; }
+@media (hover: hover) {
+  .status-option:hover:not(.selected) { border-color: var(--muted); }
+}
+.picker-swatch { flex-shrink: 0; }
+.status-option-main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.status-option-main strong { font-size: 15px; font-weight: 600; color: var(--ink); }
+.status-option-main small { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.status-option-check { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--accent); }
+.status-option.selected .status-option-check { background: var(--accent); color: var(--accent-ink); animation: tick-pop 0.2s var(--ease-press); }
+
+/* Контекст у шітці оплати: на який проєкт записуємо суму */
+.pay-context {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px; margin-bottom: 12px; border-radius: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.pay-context strong { font-size: 15px; font-weight: 700; }
+.pay-context small { color: var(--ink-soft); font-size: 12.5px; }
+
+/* Порожній список вибору з дією замість глухого кінця */
+.sheet-empty-action { display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.client-detail { display: flex; flex-direction: column; gap: 4px; }
+
+/* --- Фінанси: перемикач періоду і тижневий графік ---------------------------- */
+.segment {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--surface-soft); border-radius: 12px;
+  border: 1px solid var(--line);
+}
+.segment button {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 6px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 600;
+  transition: background var(--press-ms) ease, color var(--press-ms) ease, transform var(--press-ms) var(--ease-press);
+}
+.segment button:active { transform: scale(0.94); }
+.segment button.active {
+  background: var(--accent); color: var(--accent-ink);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.day-bar-slot i.has-payments { color: var(--accent); font-weight: 700; }
