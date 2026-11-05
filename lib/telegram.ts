@@ -5,12 +5,22 @@ type TelegramWebApp = {
   expand: () => void;
   setHeaderColor?: (color: string) => void;
   setBackgroundColor?: (color: string) => void;
+  // Дані клієнта: показуємо їх як підказку, бо server-side перевірка initData
+  // з'явиться разом із бекендом — до того це не підтверджений вхід.
+  initDataUnsafe?: { user?: TelegramUser };
   HapticFeedback?: {
     impactOccurred: (
       style: "light" | "medium" | "heavy" | "rigid" | "soft"
     ) => void;
     notificationOccurred: (type: "error" | "success" | "warning") => void;
   };
+};
+
+type TelegramUser = {
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
 };
 
 declare global {
@@ -29,8 +39,8 @@ export function initTelegram(): void {
   try {
     app.ready();
     app.expand();
-    app.setHeaderColor?.("#F7F2EC");
-    app.setBackgroundColor?.("#F7F2EC");
+    app.setHeaderColor?.("#211D1B");
+    app.setBackgroundColor?.("#211D1B");
   } catch {
     // Стара версія клієнта Telegram — не критично.
   }
@@ -44,4 +54,17 @@ export function haptic(type: "success" | "warning" | "light" = "light"): void {
   } catch {
     // HapticFeedback недоступний поза Telegram.
   }
+}
+
+/**
+ * Те, що клієнт Telegram показав як «себе»: лише підказка для першого запуску.
+ * поза Telegram повертає null, і профіль починається порожнім.
+ */
+export function telegramProfile(): { name: string; photoUrl: string } | null {
+  const user = telegramWebApp()?.initDataUnsafe?.user;
+  if (!user) return null;
+  const name = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+  const photoUrl = typeof user.photo_url === "string" ? user.photo_url : "";
+  if (!name && !photoUrl) return null;
+  return { name, photoUrl };
 }

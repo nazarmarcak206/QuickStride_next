@@ -40,7 +40,7 @@ const SPRING_DAMPING = 0.62; // < 1 — м'який overshoot
 const MAX_STRETCH = 0.22; // межа деформації пігулки від швидкості
 const STRETCH_DIVISOR = 6000; // px/s, що дають повний MAX_STRETCH
 
-export function BottomNav({ onNavigate }: { onNavigate?: () => void }) {
+export function BottomNav() {
   const pathname = usePathname();
   const activeIndex = activeIndexFor(pathname);
 
@@ -178,7 +178,6 @@ export function BottomNav({ onNavigate }: { onNavigate?: () => void }) {
             href={href}
             className={`bottom-nav-item ${isActive ? "active" : ""}`}
             aria-current={isActive ? "page" : undefined}
-            onClick={onNavigate}
           >
             <Icon size={21} strokeWidth={1.9} aria-hidden="true" />
             <span>{label}</span>

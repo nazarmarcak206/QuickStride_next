@@ -14,3 +14,11 @@ export function pluralPayments(count: number): string {
 export function pluralProjects(count: number): string {
   return pluralize(count, ["проєкт", "проєкти", "проєктів"]);
 }
+
+export function pluralClients(count: number): string {
+  return pluralize(count, ["клієнт", "клієнти", "клієнтів"]);
+}
+
+export function pluralReminders(count: number): string {
+  return pluralize(count, ["справа", "справи", "справ"]);
+}

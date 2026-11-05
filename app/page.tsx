@@ -342,7 +342,7 @@ export default function Home() {
                 <p className="overview-label warn">
                   <CircleAlert size={13} /> Прострочені · {overdue.length}
                 </p>
-                <div className="mini-list">
+                <div className="mini-list tone-overdue">
                   {overdue.map((reminder) => (
                     <div className={`mini-row task-row ${finishing.has(reminder.id) ? "is-completing" : ""}`} key={reminder.id}>
                       <button
@@ -368,7 +368,7 @@ export default function Home() {
             {todayTasks.length > 0 && (
               <>
                 <p className="overview-label">Сьогодні · {todayTasks.length}</p>
-                <div className="mini-list">
+                <div className="mini-list tone-today">
                   {todayTasks.map((reminder) => (
                     <div className={`mini-row task-row ${finishing.has(reminder.id) ? "is-completing" : ""}`} key={reminder.id}>
                       <button

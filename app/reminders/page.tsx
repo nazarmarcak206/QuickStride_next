@@ -10,7 +10,10 @@ import { useCrm } from "@/lib/store";
 import { haptic } from "@/lib/telegram";
 import type { Reminder } from "@/lib/types";
 
-const GROUP_LABELS: Record<string, string> = {
+const GROUP_TONES = ["overdue", "today", "upcoming", "done"] as const;
+type GroupTone = (typeof GROUP_TONES)[number];
+
+const GROUP_LABELS: Record<GroupTone, string> = {
   overdue: "Прострочені",
   today: "Сьогодні",
   upcoming: "Майбутні",
@@ -71,7 +74,7 @@ export default function Reminders() {
     return [client, project].filter(Boolean).join(" · ");
   };
 
-  const renderRow = (reminder: Reminder) => {
+  const renderRow = (reminder: Reminder, tone: GroupTone) => {
     const linked = linkedNames(reminder);
     const isFinishing = finishing.has(reminder.id);
     return (
@@ -88,6 +91,7 @@ export default function Reminders() {
         <span className="mini-title">
           <span className="task-title-text">{reminder.title}</span>
           <small>
+            {tone === "overdue" ? "прострочено · " : ""}
             {taskWhen(reminder, today)}
             {linked ? ` · ${linked}` : ""}
           </small>
@@ -139,13 +143,13 @@ export default function Reminders() {
             const items = groups[key];
             if (items.length === 0) return null;
             return (
-              <section className="card" key={key}>
+              <section className={`card task-group tone-${key}`} key={key}>
                 <div className="card-head">
                   <h2>
                     {GROUP_LABELS[key]} <span className="count-bubble small">{items.length}</span>
                   </h2>
                 </div>
-                <div className="mini-list">{items.map(renderRow)}</div>
+                <div className="mini-list">{items.map((item) => renderRow(item, key))}</div>
               </section>
             );
           })}
@@ -155,13 +159,13 @@ export default function Reminders() {
             </section>
           )}
           {groups.done.length > 0 && (
-            <section className="card">
+            <section className="card task-group tone-done">
               <div className="card-head">
                 <h2>
                   Виконані <span className="count-bubble small">{groups.done.length}</span>
                 </h2>
               </div>
-              <div className="mini-list">{groups.done.map(renderRow)}</div>
+              <div className="mini-list">{groups.done.map((item) => renderRow(item, "done"))}</div>
             </section>
           )}
         </>

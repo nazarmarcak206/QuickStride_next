@@ -18,12 +18,13 @@ import {
 import { formatMoney, toMinor, todayISO } from "@/lib/money";
 import { overpayNotice, overpayNoticeFor, projectCurrencyLockNote, receivedAfterMinor } from "@/lib/payments";
 import { findDuplicateClient, clientKindLabel, isClientKind, suggestClients } from "@/lib/clients";
-import { PREPAYMENT_NOTE, remainingAfterPrepayment, type ProjectInput } from "@/lib/projectCreate";
+import { remainingAfterPrepayment, type ProjectInput } from "@/lib/projectCreate";
 import { projectOwnerName, reminderLinkMismatch } from "@/lib/reminders";
 import { ListPicker, PickerSheet, type PickerOption } from "./ListPicker";
 import { Sheet } from "./ui";
 import { statusOptions } from "./StatusPicker";
 import { haptic } from "@/lib/telegram";
+import { useSettings } from "@/lib/settingsStore";
 
 // Кожна форма захищена від повторного надсилання: перший submit блокує
 // повторні виклики, поки батьківський компонент не закриє форму.
@@ -64,16 +65,14 @@ export const paymentTypeOptions: PickerOption<PaymentType>[] = PAYMENT_TYPES.map
         : "Будь-яке інше надходження",
 }));
 
-// «Не вказано» — окрема опція: старі записи та нові клієнти без ознаки
-// не повинні виглядати як «Непостійний».
-export const clientKindOptions: PickerOption<string>[] = [
-  ...CLIENT_KINDS.map((kind) => ({
-    value: kind,
-    label: kind,
-    hint: kind === "Постійний" ? "Повертається з новими проєктами" : "Одиничний запит",
-  })),
-  { value: "", label: "Не вказано", hint: "Ознаку ще не задано" },
-];
+// У виборі лишаються лише два реальні типи. «Не вказано» пунктом не є:
+// записи без ознаки (усі старі) не перепризначуються автоматично й не
+// перетворюються на «Непостійний» — вони просто не мають позначки в списку.
+export const clientKindOptions: PickerOption<string>[] = CLIENT_KINDS.map((kind) => ({
+  value: kind,
+  label: kind,
+  hint: kind === "Постійний" ? "Повертається з новими проєктами" : "Одиничний запит",
+}));
 
 export type PaymentInput = Omit<Payment, "id" | "createdAt" | "projectId">;
 
@@ -150,9 +149,7 @@ export function PaymentForm({
       <button type="submit" className="button-primary" disabled={!valid}>
         Записати оплату
       </button>
-      <p className="form-hint">
-        Оплата записується у валюті проєкту — {project.currency}. Конвертації немає, тому різні валюти не складаються в одну суму.
-      </p>
+      <p className="form-hint">Оплата — у валюті проєкту; конвертації немає.</p>
     </form>
   );
 }
@@ -214,11 +211,14 @@ export function ProjectForm({
   onCreateClient?: (input: ClientInput) => Client;
   onSubmit: (submit: ProjectSubmit) => void;
 }) {
+  const { settings } = useSettings();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [clientId, setClientId] = useState(initial?.clientId ?? "");
   const [amount, setAmount] = useState(initial ? String(initial.amountMinor / 100) : "");
   const [prepay, setPrepay] = useState("");
-  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? "UAH");
+  // Новий проєкт стартує з основної валюти в налаштуваннях; редагування
+  // завжди показує валюту самого проєкту, бо налаштування старі записи не міняють.
+  const [currency, setCurrency] = useState<Currency>(initial?.currency ?? settings.baseCurrency);
   const [status, setStatus] = useState<ProjectStatus>(initial?.status ?? "Новий");
   const [deadline, setDeadline] = useState(initial?.deadline ?? "");
   const [nextAction, setNextAction] = useState(initial?.nextAction ?? "");
@@ -328,11 +328,6 @@ export function ProjectForm({
             </div>
           </div>
           {overpay && <WarnNote text={overpay} />}
-          <p className="form-hint">
-            {prepayMinor > 0
-              ? `Одразу з’явиться один запис фактично отриманої оплати — ${formatMoney(prepayMinor, currency)} (${PREPAYMENT_NOTE.toLowerCase()}). Порожнє поле або 0 нічого не створюють.`
-              : "Передоплату можна внести й пізніше в картці проєкту. Поле лишити порожнім — жодного запису оплати не буде."}
-          </p>
         </>
       )}
       <div className="form-row">
@@ -456,13 +451,12 @@ export function ClientField({
                 <button
                   type="button"
                   className="button-secondary"
-                  disabled={!createName}
                   onClick={() => {
                     haptic("light");
                     setCreating(true);
                   }}
                 >
-                  <Plus size={15} /> Створити «{createName || "клієнта"}»
+                  <Plus size={15} /> Створити {createName ? `«${createName}»` : "клієнта"}
                 </button>
               </div>
             )
@@ -513,52 +507,69 @@ export function ClientForm({
   const [telegram, setTelegram] = useState(initial?.telegram ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
   const [kind, setKind] = useState<string>(initial?.kind ?? "");
+  // Записи без типу лишаються без типу, доки людина сама не обере значення:
+  // поле виводимо з ладу лише після реальної зміни, а не «автоматом».
+  const [kindKnown, setKindKnown] = useState(Boolean(initial?.kind));
   const [note, setNote] = useState(initial?.note ?? "");
   const [error, setError] = useState("");
+  const [askDuplicate, setAskDuplicate] = useState(false);
   const { claim, release } = useSingleSubmit();
   const quick = variant === "quick";
+
+  const clash = findDuplicateClient(existing, name, initial?.id);
+
+  const save = () => {
+    // Запис іде лише звідси: і основна кнопка, і «усе одно» проходять через
+    // блокування повторного надсилання, тож подвійний тап не створює друга.
+    if (!claim()) return;
+    setError("");
+    try {
+      onSubmit({
+        name: name.trim(),
+        company: quick ? "" : company.trim(),
+        phone: phone.trim(),
+        telegram: telegram.trim(),
+        email: quick ? "" : email.trim(),
+        note: quick ? "" : note.trim(),
+        kind: isClientKind(kind) ? kind : null,
+      });
+    } catch (caught) {
+      release();
+      setError(caught instanceof Error ? caught.message : "Не вдалося зберегти клієнта.");
+    }
+  };
 
   return (
     <form
       className="form-stack"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!claim()) return;
         if (!name.trim()) {
-          release();
           setError("Вкажіть ім’я або назву.");
           return;
         }
-        const duplicate = findDuplicateClient(existing, name, initial?.id);
-        if (duplicate) {
-          const message = initial
-            ? `Клієнт зі схожим ім'ям уже є: «${duplicate.name}». Все одно зберегти?`
-            : `Схоже, «${duplicate.name}» уже є в базі. Дублікати не об'єднуються автоматично. Все одно додати?`;
-          if (!window.confirm(message)) {
-            release();
-            return;
-          }
+        // Збіг імені — не системний confirm(), а дія всередині форми: у WebView
+        // Telegram нативний діалог може й не показатися, і створення «не працює».
+        if (clash) {
+          setAskDuplicate(true);
+          return;
         }
-        setError("");
-        try {
-          onSubmit({
-            name: name.trim(),
-            company: quick ? "" : company.trim(),
-            phone: phone.trim(),
-            telegram: telegram.trim(),
-            email: quick ? "" : email.trim(),
-            note: quick ? "" : note.trim(),
-            kind: isClientKind(kind) ? kind : null,
-          });
-        } catch (caught) {
-          release();
-          setError(caught instanceof Error ? caught.message : "Не вдалося зберегти клієнта.");
-        }
+        setAskDuplicate(false);
+        save();
       }}
     >
       <label className="field">
         Ім’я або назва
-        <input autoFocus required value={name} onChange={(event) => setName(event.target.value)} placeholder="Наприклад, Марія Шевченко" />
+        <input
+          autoFocus
+          required
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setAskDuplicate(false);
+          }}
+          placeholder="Наприклад, Марія Шевченко"
+        />
       </label>
       {quick && (
         <p className="form-hint">
@@ -577,7 +588,7 @@ export function ClientForm({
           <input value={telegram} onChange={(event) => setTelegram(event.target.value)} placeholder="@nickname" />
         </label>
         <label className="field">
-          {quick ? "Телефон (необов’язково)" : "Телефон (необов’язково)"}
+          Телефон (необов’язково)
           <input type="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+380…" />
         </label>
       </div>
@@ -587,12 +598,41 @@ export function ClientForm({
           <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
         </label>
       )}
-      <ListPicker label="Тип клієнта" title="Тип клієнта" options={clientKindOptions} value={kind} onChange={setKind} />
+      {initial && !kindKnown ? (
+        <button type="button" className="text-link" onClick={() => setKindKnown(true)}>
+          Додати тип клієнта
+        </button>
+      ) : (
+        <ListPicker
+          label="Тип клієнта"
+          title="Тип клієнта"
+          options={clientKindOptions}
+          value={kind}
+          placeholder="Оберіть тип"
+          onChange={(next) => {
+            setKind(next);
+            setKindKnown(true);
+          }}
+        />
+      )}
       {!quick && (
         <label className="field">
           Нотатки (необов’язково)
           <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={2} />
         </label>
+      )}
+      {askDuplicate && clash && (
+        <div className="form-warn" role="alert">
+          <CircleAlert size={13} />
+          <span>
+            {initial
+              ? `Клієнт зі схожим ім'ям уже є: «${clash.name}».`
+              : `Схоже, «${clash.name}» уже є в довіднику. Дублікати автоматично не об'єднуються.`}{" "}
+            <button type="button" className="text-link" onClick={save}>
+              {initial ? "Усе одно зберегти" : "Усе одно створити"}
+            </button>
+          </span>
+        </div>
       )}
       {error && <WarnNote text={error} />}
       <button type="submit" className="button-primary">

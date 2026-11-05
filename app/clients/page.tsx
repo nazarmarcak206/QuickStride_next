@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Archive, ArchiveRestore, AtSign, Briefcase, ChevronRight, Mail, Phone, Repeat, Search, UserRound, Users } from "lucide-react";
 import { EmptyState, Sheet, StatusPill, Toast, useToast } from "@/components/ui";
 import { ClientForm } from "@/components/forms";
-import { clientKindLabel, clientPaidByCurrency, clientProjects, filterClients } from "@/lib/clients";
+import { clientPaidByCurrency, clientProjects, filterClients } from "@/lib/clients";
 import { formatMoney } from "@/lib/money";
 import { pluralPayments, pluralProjects } from "@/lib/text";
 import { projectReceivedMinor, useCrm } from "@/lib/store";
@@ -16,9 +16,10 @@ const kindStyle: Record<ClientKind, string> = {
   "Непостійний": "is-oneoff",
 };
 
-// Фільтр за типом: «не вказано» — окрема сходинка, бо старі записи без ознаки
-// не належать ані до постійних, ані до непостійних.
-const KIND_FILTERS = ["усі", ...CLIENT_KINDS, "не вказано"] as const;
+// Фільтр за типом: лише два справжні типи плюс «усі». Записи без ознаки
+// (усі старі) лишаються у списку під «усі»; окремим пунктом «не вказано» вони
+// не стають, і автоматичного перепризначення не робиться.
+const KIND_FILTERS = ["усі", ...CLIENT_KINDS] as const;
 type KindFilter = (typeof KIND_FILTERS)[number];
 
 function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () => void }) {
@@ -79,11 +80,14 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
             )}
 
             <div className="kind-row">
-              <span className={`kind-tag ${client.kind ? kindStyle[client.kind] : "is-unknown"}`}>
-                {client.kind === "Постійний" ? <Repeat size={12} /> : <UserRound size={12} />}
-                {clientKindLabel(client.kind)}
-              </span>
-              {client.kind === null && <small>тип не задано</small>}
+              {client.kind ? (
+                <span className={`kind-tag ${kindStyle[client.kind]}`}>
+                  {client.kind === "Постійний" ? <Repeat size={12} /> : <UserRound size={12} />}
+                  {client.kind}
+                </span>
+              ) : (
+                <small>тип не задано · можна вказати через «Редагувати»</small>
+              )}
             </div>
 
             <div className="fact-rows contacts">
@@ -191,7 +195,7 @@ export default function Clients() {
             aria-pressed={kindFilter === kind}
             onClick={() => setKindFilter(kind)}
           >
-            {kind === "усі" ? "Усі типи" : kind === "не вказано" ? "Не вказано" : kind}
+            {kind === "усі" ? "Усі типи" : kind}
           </button>
         ))}
       </div>
@@ -225,10 +229,12 @@ export default function Clients() {
                   </span>
                   <span className="client-side">
                     <small>{projects.length > 0 ? `${projects.length} ${pluralProjects(projects.length)}` : "Без проєктів"}</small>
-                    <span className={`kind-tag small ${client.kind ? kindStyle[client.kind] : "is-unknown"}`}>
-                      {client.kind === "Постійний" ? <Repeat size={11} /> : <UserRound size={11} />}
-                      {clientKindLabel(client.kind)}
-                    </span>
+                    {client.kind && (
+                      <span className={`kind-tag small ${kindStyle[client.kind]}`}>
+                        {client.kind === "Постійний" ? <Repeat size={11} /> : <UserRound size={11} />}
+                        {client.kind}
+                      </span>
+                    )}
                     {client.archived && (
                       <small className="archived-mark">
                         <Archive size={11} /> архів

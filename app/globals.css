@@ -118,35 +118,26 @@ p { margin: 0; }
 .brand-mark::after { content: "Q"; color: var(--accent-ink); font-weight: 800; font-size: 15px; }
 .brand-name { font-weight: 700; font-size: 17px; letter-spacing: -0.3px; }
 .topbar-actions { display: flex; align-items: center; gap: 6px; }
-.topbar-actions svg { transition: transform 0.2s var(--ease-sheet); }
-.icon-button[aria-expanded="true"] svg { transform: rotate(60deg); }
 
 .icon-button {
   position: relative;
   display: inline-flex; align-items: center; justify-content: center;
   width: 36px; height: 36px; border-radius: 11px;
   border: 0; background: transparent; color: var(--ink-soft);
+  text-decoration: none;
   transition: transform var(--press-ms) var(--ease-press), background var(--press-ms) ease, color var(--press-ms) ease;
 }
 /* Невидиме розширення зони натискання до 44px без зміни верстки */
 .icon-button::before { content: ""; position: absolute; inset: -4px; border-radius: inherit; }
 .icon-button:active { transform: scale(0.88); background: var(--surface-soft); }
 .icon-button:disabled { opacity: 0.35; cursor: default; transform: none; }
+/* Шестерня у верхній панелі — це посилання на «Налаштування»: активний розділ
+   підсвічується, інакше сторінка налаштувань не мала б жодного індикатора. */
+.icon-button.is-active { color: var(--accent); background: var(--accent-soft); }
 @media (hover: hover) {
   .icon-button:hover { background: var(--surface-soft); }
+  .icon-button.is-active:hover { background: color-mix(in srgb, var(--accent) 26%, var(--surface-soft)); }
 }
-
-.more-menu {
-  position: relative; z-index: 15; margin-top: 10px;
-  padding: 14px; border-radius: 20px;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-  animation: menu-in 0.18s var(--ease-sheet);
-}
-@keyframes menu-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 
 /* --- Нижня навігація: плаваюча скляна панель ---------------------------- */
 .bottom-nav {
@@ -471,6 +462,51 @@ p { margin: 0; }
 .check-button svg { animation: tick-draw 0.2s var(--ease-sheet) both; }
 @keyframes tick-draw { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
 
+/* --- Стани справ ----------------------------------------------------------
+   Групи розрізняються тоном (смуга ліворуч + підсвітка рамки), а стан читається
+   й без кольору: назва групи, дата й час лишаються текстом. Логіка дат не чіпається.
+   Тон елемента .tone-* працює і на картці групи, і на списку всередині дашборда. */
+.task-group { position: relative; }
+.task-group::before {
+  content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 3px;
+  border-radius: 999px; background: var(--line);
+}
+
+/* Прострочені — стриманий червоний: ледь помітний тон карти й активний акцент */
+.card.tone-overdue {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--glass-border));
+  background: color-mix(in srgb, var(--danger) 7%, var(--glass));
+}
+.tone-overdue::before { background: var(--danger); }
+.tone-overdue .card-head h2 { color: var(--danger); }
+.tone-overdue .count-bubble { background: color-mix(in srgb, var(--danger) 22%, transparent); color: var(--danger); }
+.tone-overdue .mini-row small,
+.tone-overdue .mini-time { color: color-mix(in srgb, var(--danger) 80%, var(--ink-soft)); }
+.tone-overdue .check-button { border-color: color-mix(in srgb, var(--danger) 60%, var(--line)); }
+
+/* Майбутні — спокійний пісочний: намір, а не тривога */
+.card.tone-upcoming { background: color-mix(in srgb, var(--sand) 5%, var(--glass)); }
+.tone-upcoming::before { background: color-mix(in srgb, var(--sand) 55%, transparent); }
+.tone-upcoming .card-head h2 { color: var(--ink-soft); }
+.tone-upcoming .count-bubble { background: color-mix(in srgb, var(--sand) 16%, transparent); color: var(--sand); }
+.tone-upcoming .check-button { border-color: color-mix(in srgb, var(--sand) 35%, var(--line)); }
+
+/* Сьогодні — фірмовий помаранчевий: поточний день */
+.tone-today::before { background: var(--accent); }
+.tone-today .mini-time,
+.tone-today .mini-row small { color: color-mix(in srgb, var(--accent) 78%, var(--ink-soft)); }
+
+/* Виконане — приглушене: перекреслення вже є, додаємо тиху рамку та зниклий акцент */
+.card.tone-done {
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border-color: color-mix(in srgb, var(--line) 75%, transparent);
+  box-shadow: none;
+}
+.tone-done::before { background: color-mix(in srgb, var(--muted) 40%, transparent); }
+.tone-done .card-head h2 { color: var(--muted); }
+.tone-done .count-bubble { background: color-mix(in srgb, var(--muted) 20%, transparent); color: var(--muted); }
+.tone-done .check-button.checked { background: color-mix(in srgb, var(--positive) 38%, transparent); border-color: transparent; color: var(--ink-soft); }
+
 /* --- Статуси -------------------------------------------------------------- */
 .status-pill {
   display: inline-flex; align-items: center;
@@ -575,14 +611,19 @@ html[data-keyboard-open] .sheet { padding-bottom: 18px; }
 }
 .form-stack { display: flex; flex-direction: column; gap: 12px; }
 /* Два поля в рядок тримаються, лише коли кожному вистачає ~160px.
-   WebKit не дає input[type=date] стискатися нижче своєї вбудованої ширини,
-   тому на вузькому екрані рядок розгортається у стовпчик, а не лізе за край. */
-.form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
-.form-row > .field { flex: 1 1 160px; }
-/* date/time на iPhone — найвибагливіші: на вузькому екрані їм потрібна весь рядок. */
+   Сітка, а не флекс: у флекса flex-basis рахується по головній осі, тому
+   «1 1 160px» при переході у стовпчик перетворювався на 160px ВИСоти кожного
+   поля — на екрані вужчому за 430px форма розтягалася удвічі. */
+.form-row {
+  display: grid;
+  gap: 10px;
+  align-items: end;
+  grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+}
+/* date/time на iPhone — найвибагливіші: на вузькому екрані їм потрібен увесь рядок. */
 @media (max-width: 429px) {
   .form-row:has(input[type="date"]),
-  .form-row:has(input[type="time"]) { flex-direction: column; align-items: stretch; }
+  .form-row:has(input[type="time"]) { grid-template-columns: 1fr; }
 }
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ink-soft); flex: 1; min-width: 0; }
 .field input, .field textarea {
@@ -661,9 +702,41 @@ html[data-keyboard-open] .sheet { padding-bottom: 18px; }
 .sheet-search { margin-bottom: 12px; }
 .sheet-create { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .reset-card { display: flex; flex-direction: column; gap: 8px; }
-.reset-title { font-weight: 700; font-size: 15px; }
 .reset-text { color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.reset-text.warn {
+  display: flex; align-items: flex-start; gap: 7px;
+  color: var(--danger); font-weight: 500;
+  padding: 9px 11px; border-radius: 12px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-soft));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.reset-text.warn svg { flex-shrink: 0; margin-top: 2px; }
+.reset-actions { display: flex; gap: 10px; }
 .reset-card .button-secondary { flex: none; align-self: flex-start; }
+.reset-card .reset-actions .button-secondary { flex: 1; align-self: auto; }
+
+/* --- Налаштування -------------------------------------------------------------- */
+.profile-head { display: flex; align-items: flex-end; gap: 12px; }
+.profile-name { flex: 1; min-width: 0; display: flex; align-items: flex-end; gap: 10px; }
+.profile-name .field { flex: 1; }
+.profile-card { display: flex; flex-direction: column; gap: 10px; }
+.avatar-lg { width: 52px; height: 52px; font-size: 18px; }
+.avatar-photo { object-fit: cover; border: 1px solid var(--glass-border); }
+.settings-block { display: flex; flex-direction: column; gap: 8px; }
+.settings-block + .settings-block { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.settings-label { font-size: 13px; font-weight: 600; color: var(--ink-soft); }
+.app-badge {
+  padding: 3px 9px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+  font-size: 11.5px; font-weight: 700; letter-spacing: 0.3px;
+}
+/* На вузькому екрані аватар, поле й кнопка стають у стовпчик: у рядка поле
+   стискалося до ~100 px, і вводити ім’я було ніяк. */
+@media (max-width: 359px) {
+  .profile-head,
+  .profile-name { flex-direction: column; align-items: stretch; }
+  .profile-name .button-primary { width: 100%; }
+}
 
 /* --- Порожні стани, тости ------------------------------------------------------ */
 .empty-state {
@@ -726,12 +799,12 @@ html[data-keyboard-open] .sheet { padding-bottom: 18px; }
 /* Запасний вигляд без розмиття: поверхні стають щільними, контент читається.
    Стосується всіх скляних елементів одразу. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .topbar, .bottom-nav, .card, .quick-tile, .sheet, .more-menu {
+  .topbar, .bottom-nav, .card, .quick-tile, .sheet {
     background: var(--surface);
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
   }
-  .bottom-nav, .card, .quick-tile, .sheet, .more-menu { border-color: var(--line); }
+  .bottom-nav, .card, .quick-tile, .sheet { border-color: var(--line); }
   /* Пігулка без розмиття: щільніший акцентний тон, щоб активний пункт читався */
   .bottom-nav-pill {
     -webkit-backdrop-filter: none;
@@ -852,8 +925,8 @@ body[data-page-revealed] .status-diagram { animation-play-state: running; }
   display: inline-flex; align-items: center; gap: 3px;
   color: var(--muted); font-size: 11px; font-weight: 600;
 }
-/* Тип клієнта — позначка, а не стать: «Не вказано» навмисно нейтральне,
-   щоб старий запис без ознаки не виглядав як «Непостійний». */
+/* Тип клієнта — позначка, а не стать: запис без типу не отримує жодної позначки,
+   а окремий пункт «Не вказано» з вибору й фільтрів прибнено навмисно. */
 .kind-tag {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 3px 8px; border-radius: 999px;
@@ -862,7 +935,6 @@ body[data-page-revealed] .status-diagram { animation-play-state: running; }
 }
 .kind-tag.is-regular { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 40%, var(--line)); }
 .kind-tag.is-oneoff { color: var(--muted); }
-.kind-tag.is-unknown { color: var(--muted); border-style: dashed; }
 .kind-tag.small { padding: 2px 7px; font-size: 10.5px; }
 .kind-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 2px 0 6px; }
 .kind-row small { color: var(--muted); font-size: 11.5px; }
