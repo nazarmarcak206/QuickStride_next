@@ -46,12 +46,13 @@ export default function Reminders() {
   const completeReminder = (reminder: Reminder) => {
     if (finishingTimers.current.has(reminder.id)) return;
     haptic("light");
+    const save = () => toggleReminder(reminder.id).catch(() => notify("Не вдалося зберегти справу"));
     if (reminder.done || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      toggleReminder(reminder.id);
+      void save();
       return;
     }
     setFinishing((previous) => new Set(previous).add(reminder.id));
-    toggleReminder(reminder.id);
+    void save();
     const timer = setTimeout(() => {
       finishingTimers.current.delete(reminder.id);
       setFinishing((previous) => {
@@ -104,9 +105,12 @@ export default function Reminders() {
           className="icon-button"
           onClick={() => {
             if (window.confirm("Видалити цю справу?")) {
-              deleteReminder(reminder.id);
-              haptic("warning");
-              notify("Справу видалено");
+              deleteReminder(reminder.id)
+                .then(() => {
+                  haptic("warning");
+                  notify("Справу видалено");
+                })
+                .catch((error) => notify(error instanceof Error ? error.message : "Не вдалося видалити справу."));
             }
           }}
           aria-label={`Видалити справу «${reminder.title}»`}
@@ -181,8 +185,8 @@ export default function Reminders() {
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
             onCreateClient={addClient}
-            onSubmit={(input) => {
-              addReminder(input);
+            onSubmit={async (input) => {
+              await addReminder(input);
               setCreating(false);
               haptic("success");
               notify("Справу додано");
@@ -197,8 +201,8 @@ export default function Reminders() {
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
             initial={editing}
-            onSubmit={(input) => {
-              updateReminder(editing.id, input);
+            onSubmit={async (input) => {
+              await updateReminder(editing.id, input);
               setEditing(null);
               haptic("success");
               notify("Справу оновлено");

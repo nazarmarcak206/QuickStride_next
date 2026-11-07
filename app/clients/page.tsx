@@ -31,14 +31,17 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
   const paymentsCount = state.payments.filter((payment) => projects.some((project) => project.id === payment.projectId)).length;
 
   const archive = () => {
-    updateClient(client.id, { archived: !client.archived });
-    haptic(client.archived ? "success" : "warning");
-    notify(
-      client.archived
-        ? "Клієнта повернено з архіву"
-        : "Клієнта архівовано — проєкти й оплати залишилися",
-    );
-    onClose();
+    void updateClient(client.id, { archived: !client.archived })
+      .then(() => {
+        haptic(client.archived ? "success" : "warning");
+        notify(
+          client.archived
+            ? "Клієнта повернено з архіву"
+            : "Клієнта архівовано — проєкти й оплати залишилися",
+        );
+        onClose();
+      })
+      .catch((error) => notify(error instanceof Error ? error.message : "Не вдалося змінити клієнта."));
   };
 
   return (
@@ -48,8 +51,8 @@ function ClientDetailSheet({ client, onClose }: { client: Client; onClose: () =>
           <ClientForm
             initial={client}
             existing={state.clients}
-            onSubmit={(input) => {
-              updateClient(client.id, input);
+            onSubmit={async (input) => {
+              await updateClient(client.id, input);
               setEditing(false);
               haptic("success");
               notify("Клієнта оновлено");
@@ -276,8 +279,8 @@ export default function Clients() {
         <Sheet title="Новий клієнт" variant="form" onClose={() => setCreating(false)}>
           <ClientForm
             existing={state.clients}
-            onSubmit={(input) => {
-              addClient(input);
+            onSubmit={async (input) => {
+              await addClient(input);
               setCreating(false);
               haptic("success");
               notify("Клієнта додано");

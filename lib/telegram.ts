@@ -1,12 +1,12 @@
 // Мінімальна інтеграція з Telegram WebApp: у браузері все працює без неї.
-// Розширену перевірку initData зробить сервер, коли з'явиться бекенд.
+// Серверна перевірка initData реалізована в app/api/auth/telegram.
 type TelegramWebApp = {
   ready: () => void;
   expand: () => void;
   setHeaderColor?: (color: string) => void;
   setBackgroundColor?: (color: string) => void;
-  // Дані клієнта: показуємо їх як підказку, бо server-side перевірка initData
-  // з'явиться разом із бекендом — до того це не підтверджений вхід.
+  // Сирі initData для серверної перевірки; initDataUnsafe — лише підказка UI.
+  initData?: string;
   initDataUnsafe?: { user?: TelegramUser };
   HapticFeedback?: {
     impactOccurred: (
@@ -54,6 +54,15 @@ export function haptic(type: "success" | "warning" | "light" = "light"): void {
   } catch {
     // HapticFeedback недоступний поза Telegram.
   }
+}
+
+/**
+ * Сирі initData для обміну на серверну сесію. Порожній рядок означає,
+ * що застосунок відкрито не в Telegram — працює локальний демо-режим.
+ */
+export function telegramInitData(): string {
+  const initData = telegramWebApp()?.initData;
+  return typeof initData === "string" ? initData : "";
 }
 
 /**

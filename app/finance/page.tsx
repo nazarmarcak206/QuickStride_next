@@ -183,10 +183,13 @@ export default function Finance() {
       date: editDate,
       type: editType,
     };
-    updatePayment(editing.id, patch);
-    setEditing(null);
-    haptic("success");
-    notify("Оплату оновлено — підсумки перераховано");
+    void updatePayment(editing.id, patch)
+      .then(() => {
+        setEditing(null);
+        haptic("success");
+        notify("Оплату оновлено — підсумки перераховано");
+      })
+      .catch(error => notify(error instanceof Error ? error.message : "Не вдалося зберегти оплату."));
   };
 
   return (
@@ -450,10 +453,13 @@ export default function Finance() {
                       "Видалити цю оплату? Підсумки проєкту й фінансів перерахуються."
                     )
                   ) {
-                    deletePayment(editing.id);
-                    setEditing(null);
-                    haptic("warning");
-                    notify("Оплату видалено");
+                    deletePayment(editing.id)
+                      .then(() => {
+                        setEditing(null);
+                        haptic("warning");
+                        notify("Оплату видалено");
+                      })
+                      .catch(error => notify(error instanceof Error ? error.message : "Не вдалося видалити оплату."));
                   }
                 }}
               >

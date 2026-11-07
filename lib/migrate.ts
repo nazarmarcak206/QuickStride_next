@@ -34,7 +34,7 @@ export function migrateClient(raw: Partial<Client> & { id: string }): Client {
   };
 }
 
-function migrateProject(raw: Partial<Project> & { id: string }): Project {
+export function migrateProject(raw: Partial<Project> & { id: string }): Project {
   return {
     id: raw.id,
     clientId: typeof raw.clientId === "string" ? raw.clientId : null,
@@ -50,7 +50,7 @@ function migrateProject(raw: Partial<Project> & { id: string }): Project {
   };
 }
 
-function migratePayment(raw: Partial<Payment> & { id: string }): Payment {
+export function migratePayment(raw: Partial<Payment> & { id: string }): Payment {
   return {
     id: raw.id,
     projectId: text(raw.projectId),
@@ -63,7 +63,7 @@ function migratePayment(raw: Partial<Payment> & { id: string }): Payment {
   };
 }
 
-function migrateReminder(raw: Partial<Reminder> & { id: string }): Reminder {
+export function migrateReminder(raw: Partial<Reminder> & { id: string }): Reminder {
   return {
     id: raw.id,
     title: text(raw.title),

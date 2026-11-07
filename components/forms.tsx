@@ -86,7 +86,7 @@ export function PaymentForm({
 }: {
   project: Project;
   payments?: Payment[];
-  onSubmit: (input: PaymentInput) => void;
+  onSubmit: (input: PaymentInput) => void | Promise<void>;
 }) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayISO());
@@ -104,15 +104,16 @@ export function PaymentForm({
   return (
     <form
       className="form-stack"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
         if (!claim()) return;
         setNotice("");
         try {
-          onSubmit({ amountMinor: enteredMinor, currency: project.currency, date, type, note: note.trim() });
+          // Очікуємо сервер (або локальний запис): помилка — відхилення
+          // (наприклад, валюта не збігається з проєктом) — блокування знято,
+          // суму можна виправити й надіслати ще раз.
+          await onSubmit({ amountMinor: enteredMinor, currency: project.currency, date, type, note: note.trim() });
         } catch (error) {
-          // Запис відхилено (наприклад, валюта не збігається з проєктом) —
-          // блокування знято, суму можна виправити й надіслати ще раз.
           release();
           setNotice(error instanceof Error ? error.message : "Не вдалося записати оплату.");
         }
@@ -208,8 +209,8 @@ export function ProjectForm({
   clients: Client[];
   initial?: Project;
   payments?: Payment[];
-  onCreateClient?: (input: ClientInput) => Client;
-  onSubmit: (submit: ProjectSubmit) => void;
+  onCreateClient?: (input: ClientInput) => Client | Promise<Client>;
+  onSubmit: (submit: ProjectSubmit) => void | Promise<void>;
 }) {
   const { settings } = useSettings();
   const [title, setTitle] = useState(initial?.title ?? "");
@@ -235,7 +236,7 @@ export function ProjectForm({
   return (
     <form
       className="form-stack"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
         // Спершу заявляємо блокування і лише потім перевіряємо поля:
         // інакше другий submit зніме блокування першого, і проєкт створиться двічі.
@@ -247,7 +248,7 @@ export function ProjectForm({
         }
         setError("");
         try {
-          onSubmit({
+          await onSubmit({
             project: {
               title: title.trim(),
               clientId: clientId || null,
@@ -370,7 +371,7 @@ export function ClientField({
   value: string;
   label?: string;
   title?: string;
-  onCreateClient?: (input: ClientInput) => Client;
+  onCreateClient?: (input: ClientInput) => Client | Promise<Client>;
   onChange: (clientId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -470,14 +471,15 @@ export function ClientField({
             variant="quick"
             initialName={createName}
             existing={clients}
-            onSubmit={(input) => {
-              const client = onCreateClient(input);
+            onSubmit={async (input) => {
+              const client = await onCreateClient(input);
               setCreatedId(client.id);
               onChange(client.id);
               setCreating(false);
               setOpen(false);
               setQuery("");
               haptic("success");
+              return client;
             }}
           />
         </Sheet>
@@ -499,7 +501,7 @@ export function ClientForm({
   initialName?: string;
   existing?: Client[];
   variant?: "full" | "quick";
-  onSubmit: (input: ClientInput) => void;
+  onSubmit: (input: ClientInput) => Client | void | Promise<Client | void>;
 }) {
   const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [company, setCompany] = useState(initial?.company ?? "");
@@ -523,20 +525,22 @@ export function ClientForm({
     // блокування повторного надсилання, тож подвійний тап не створює друга.
     if (!claim()) return;
     setError("");
-    try {
-      onSubmit({
-        name: name.trim(),
-        company: quick ? "" : company.trim(),
-        phone: phone.trim(),
-        telegram: telegram.trim(),
-        email: quick ? "" : email.trim(),
-        note: quick ? "" : note.trim(),
-        kind: isClientKind(kind) ? kind : null,
-      });
-    } catch (caught) {
-      release();
-      setError(caught instanceof Error ? caught.message : "Не вдалося зберегти клієнта.");
-    }
+    void (async () => {
+      try {
+        await onSubmit({
+          name: name.trim(),
+          company: quick ? "" : company.trim(),
+          phone: phone.trim(),
+          telegram: telegram.trim(),
+          email: quick ? "" : email.trim(),
+          note: quick ? "" : note.trim(),
+          kind: isClientKind(kind) ? kind : null,
+        });
+      } catch (caught) {
+        release();
+        setError(caught instanceof Error ? caught.message : "Не вдалося зберегти клієнта.");
+      }
+    })();
   };
 
   return (
@@ -654,8 +658,8 @@ export function ReminderForm({
   projects: Project[];
   clients: Client[];
   initial?: Reminder;
-  onCreateClient?: (input: ClientInput) => Client;
-  onSubmit: (input: ReminderInput) => void;
+  onCreateClient?: (input: ClientInput) => Client | Promise<Client>;
+  onSubmit: (input: ReminderInput) => void | Promise<void>;
 }) {
   const [title, setTitle] = useState(initial?.title ?? "");
   const [date, setDate] = useState(initial ? initial.datetime.slice(0, 10) : todayISO());
@@ -671,7 +675,7 @@ export function ReminderForm({
   return (
     <form
       className="form-stack"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
         if (!claim()) return;
         if (!title.trim()) {
@@ -681,7 +685,7 @@ export function ReminderForm({
         }
         setError("");
         try {
-          onSubmit({ title: title.trim(), datetime: `${date}T${time}`, clientId: clientId || null, projectId: projectId || null });
+          await onSubmit({ title: title.trim(), datetime: `${date}T${time}`, clientId: clientId || null, projectId: projectId || null });
         } catch (caught) {
           release();
           setError(caught instanceof Error ? caught.message : "Не вдалося зберегти справу.");

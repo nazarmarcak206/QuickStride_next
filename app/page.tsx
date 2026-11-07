@@ -24,6 +24,18 @@ function greeting(): string {
   return "Доброго вечора";
 }
 
+// Підпис під головним екраном: де зараз живуть дані.
+function DemoNote() {
+  const { isDemo } = useCrm();
+  return (
+    <p className="demo-note">
+      {isDemo
+        ? "Демо-режим: дані збережені локально в цьому браузері."
+        : "Дані збережено в базі QuickStride і доступні на всіх пристроях акаунта."}
+    </p>
+  );
+}
+
 const STATUS_BAR_CLASS: Record<string, string> = {
   "Новий": "bar-muted",
   "Обговорення": "bar-coral",
@@ -105,7 +117,7 @@ function StatusDiagram({ counts, total }: { counts: StatusCount[]; total: number
 }
 
 export default function Home() {
-  const { state, addProject, addClient, addPayment, addReminder, toggleReminder } = useCrm();
+  const { state, addProject, addProjectWithPayment, addClient, addPayment, addReminder, toggleReminder } = useCrm();
   const { toast, notify } = useToast();
   const router = useRouter();
   const [projectOpen, setProjectOpen] = useState(false);
@@ -128,12 +140,13 @@ export default function Home() {
   const completeReminder = (id: string) => {
     if (finishingTimers.current.has(id)) return;
     haptic("light");
+    const save = () => toggleReminder(id).catch(() => notify("Не вдалося зберегти справу"));
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      toggleReminder(id);
+      void save();
       return;
     }
     setFinishing((previous) => new Set(previous).add(id));
-    toggleReminder(id);
+    void save();
     const timer = setTimeout(() => {
       finishingTimers.current.delete(id);
       setFinishing((previous) => {
@@ -419,15 +432,15 @@ export default function Home() {
         )}
       </section>
 
-      <p className="demo-note">Демо-дані збережені локально в цьому браузері, база даних не підключена.</p>
+      <DemoNote />
 
       {projectOpen && (
         <Sheet title="Новий проєкт" variant="form" onClose={() => setProjectOpen(false)}>
           <ProjectForm
             clients={state.clients}
             onCreateClient={addClient}
-            onSubmit={({ project: input, prepaymentMinor }) => {
-              const { payment } = createProjectWithPrepayment({ addProject, addPayment }, input, prepaymentMinor);
+            onSubmit={async ({ project: input, prepaymentMinor }) => {
+              const { payment } = await createProjectWithPrepayment({ addProject, addPayment, addProjectWithPayment }, input, prepaymentMinor);
               setProjectOpen(false);
               haptic("success");
               notify(payment ? `Проєкт і передоплату ${formatMoney(payment.amountMinor, payment.currency)} записано` : "Проєкт створено");
@@ -439,8 +452,8 @@ export default function Home() {
         <Sheet title="Новий клієнт" variant="form" onClose={() => setClientOpen(false)}>
           <ClientForm
             existing={state.clients}
-            onSubmit={(input: ClientInput) => {
-              addClient(input);
+            onSubmit={async (input: ClientInput) => {
+              await addClient(input);
               setClientOpen(false);
               haptic("success");
               notify("Клієнта додано");
@@ -454,8 +467,8 @@ export default function Home() {
             projects={state.projects.filter((project) => project.status !== "Скасований")}
             clients={state.clients}
             onCreateClient={addClient}
-            onSubmit={(input: ReminderInput) => {
-              addReminder(input);
+            onSubmit={async (input: ReminderInput) => {
+              await addReminder(input);
               setReminderOpen(false);
               haptic("success");
               notify("Справу додано");
@@ -507,8 +520,8 @@ export default function Home() {
           <PaymentForm
             project={payFor}
             payments={projectPayments(state, payFor.id)}
-            onSubmit={(input: PaymentInput) => {
-              addPayment({ projectId: payFor.id, ...input });
+            onSubmit={async (input: PaymentInput) => {
+              await addPayment({ projectId: payFor.id, ...input });
               setPayFor(null);
               haptic("success");
               notify("Оплату записано — фінанси оновлено");

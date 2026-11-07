@@ -13,23 +13,35 @@ export function remainingAfterPrepayment(amountMinor: number, prepaymentMinor: n
 }
 
 type Deps = {
-  addProject: (input: ProjectInput) => Project;
-  addPayment: (input: Omit<Payment, "id" | "createdAt">) => Payment;
+  addProject: (input: ProjectInput) => Project | Promise<Project>;
+  addPayment: (input: Omit<Payment, "id" | "createdAt">) => Payment | Promise<Payment>;
+  // Режим акаунта: сервер зберігає проєкт і передоплату однією транзакцією.
+  // Якщо надано — використовується саме він, і два окремі виклики не потрібні.
+  addProjectWithPayment?: (
+    input: ProjectInput,
+    prepaymentMinor: number,
+    date: string
+  ) => Promise<{ project: Project; payment: Payment | null }>;
 };
 
 /**
  * Один виклик = один проєкт і щонайбільше одна оплата. Викликається з форми,
  * яка блокує повторне надсилання, тож подвійний клік не створює другого запису.
+ * Очікує завершення запису (у режимі акаунта — відповіді сервера), тому помилка
+ * зберігання доходить до форми як відхилення, а проєкт не «зникає».
  */
-export function createProjectWithPrepayment(
+export async function createProjectWithPrepayment(
   deps: Deps,
   input: ProjectInput,
   prepaymentMinor: number,
   date: string = todayISO()
-): { project: Project; payment: Payment | null } {
-  const project = deps.addProject(input);
+): Promise<{ project: Project; payment: Payment | null }> {
+  if (deps.addProjectWithPayment) {
+    return deps.addProjectWithPayment(input, prepaymentMinor, date);
+  }
+  const project = await deps.addProject(input);
   if (!(prepaymentMinor > 0)) return { project, payment: null };
-  const payment = deps.addPayment({
+  const payment = await deps.addPayment({
     projectId: project.id,
     amountMinor: prepaymentMinor,
     // Валюта платежу — валюта проєкту: змішування валют заборонене політикою MVP.

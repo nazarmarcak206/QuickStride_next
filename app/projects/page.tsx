@@ -44,8 +44,8 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
   const remaining = Math.max(0, project.amountMinor - received);
   const progress = project.amountMinor > 0 ? Math.min(100, Math.round((received / project.amountMinor) * 100)) : 0;
 
-  const handleAddPayment = (input: PaymentInput) => {
-    addPayment({ projectId: project.id, ...input });
+  const handleAddPayment = async (input: PaymentInput) => {
+    await addPayment({ projectId: project.id, ...input });
     setPayOpen(false);
     haptic("success");
     notify("Оплату записано — фінанси оновлено");
@@ -163,17 +163,20 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
                       payment={payment}
                       project={project}
                       payments={payments}
-                      onSave={(amountMinor, date, type) => {
-                        updatePayment(payment.id, { amountMinor, date, type });
+                      onSave={async (amountMinor, date, type) => {
+                        await updatePayment(payment.id, { amountMinor, date, type });
                         setEditingPayment(null);
                         notify("Оплату оновлено");
                       }}
                       onCancel={() => setEditingPayment(null)}
                       onDelete={() => {
                         if (window.confirm("Видалити цю оплату?")) {
-                          deletePayment(payment.id);
-                          setEditingPayment(null);
-                          notify("Оплату видалено");
+                          deletePayment(payment.id)
+                            .then(() => {
+                              setEditingPayment(null);
+                              notify("Оплату видалено");
+                            })
+                            .catch((error) => notify(error instanceof Error ? error.message : "Не вдалося видалити оплату."));
                         }
                       }}
                     />
@@ -225,9 +228,12 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
           current={project.status}
           onClose={() => setStatusOpen(false)}
           onSelect={(status) => {
-            updateProject(project.id, { status });
-            haptic("success");
-            notify(`Статус: ${status}`);
+            void updateProject(project.id, { status })
+              .then(() => {
+                haptic("success");
+                notify(`Статус: ${status}`);
+              })
+              .catch((error) => notify(error instanceof Error ? error.message : "Не вдалося змінити статус."));
           }}
         />
       )}
@@ -245,8 +251,8 @@ function ProjectDetail({ project, onClose }: { project: Project; onClose: () => 
             initial={project}
             payments={payments}
             onCreateClient={addClient}
-            onSubmit={({ project: edited }) => {
-              updateProject(project.id, edited);
+            onSubmit={async ({ project: edited }) => {
+              await updateProject(project.id, edited);
               setEditOpen(false);
               haptic("success");
               notify("Проєкт оновлено");
@@ -275,13 +281,14 @@ function PaymentInlineEdit({
     amountMinor: number,
     date: string,
     type: PaymentInput["type"]
-  ) => void;
+  ) => void | Promise<void>;
   onCancel: () => void;
   onDelete: () => void;
 }) {
   const [amount, setAmount] = useState(String(payment.amountMinor / 100));
   const [date, setDate] = useState(payment.date);
   const [type, setType] = useState(payment.type as PaymentInput["type"]);
+  const [error, setError] = useState("");
 
   const enteredMinor = Math.round(
     (Number.parseFloat(amount.replace(",", ".")) || 0) * 100
@@ -306,7 +313,10 @@ function PaymentInlineEdit({
         const amountMinor = Math.round(
           (Number.parseFloat(amount.replace(",", ".")) || 0) * 100
         );
-        if (amountMinor > 0) onSave(amountMinor, date, type);
+        if (amountMinor <= 0) return;
+        Promise.resolve(onSave(amountMinor, date, type)).catch((caught: unknown) =>
+          setError(caught instanceof Error ? caught.message : "Не вдалося зберегти оплату.")
+        );
       }}
     >
       <div className="form-row">
@@ -340,6 +350,12 @@ function PaymentInlineEdit({
           <span>{overpay}</span>
         </p>
       )}
+      {error && (
+        <p className="form-warn" role="alert">
+          <CircleAlert size={13} />
+          <span>{error}</span>
+        </p>
+      )}
       <div className="form-row">
         <button type="button" className="button-danger" onClick={onDelete}>
           <X size={14} /> Видалити
@@ -353,7 +369,7 @@ function PaymentInlineEdit({
 }
 
 export default function Projects() {
-  const { state, addClient, addProject, addPayment } = useCrm();
+  const { state, addClient, addProject, addProjectWithPayment, addPayment } = useCrm();
   const { toast, notify } = useToast();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("Усі");
@@ -498,8 +514,8 @@ export default function Projects() {
           <ProjectForm
             clients={state.clients}
             onCreateClient={addClient}
-            onSubmit={({ project: input, prepaymentMinor }) => {
-              const { payment } = createProjectWithPrepayment({ addProject, addPayment }, input, prepaymentMinor);
+            onSubmit={async ({ project: input, prepaymentMinor }) => {
+              const { payment } = await createProjectWithPrepayment({ addProject, addPayment, addProjectWithPayment }, input, prepaymentMinor);
               setCreating(false);
               haptic("success");
               notify(payment ? `Проєкт і передоплату ${formatMoney(payment.amountMinor, payment.currency)} записано` : "Проєкт створено");
